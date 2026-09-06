@@ -314,12 +314,14 @@ export async function speakText({
   model = "aura-asteria-en",
   speed = 1,
   expressivity = 0,
+  signal,
 }: {
   text: string;
   apiKey?: string;
   model?: string;
   speed?: number;
   expressivity?: number;
+  signal?: AbortSignal;
 }): Promise<Blob> {
 
   const useProxy = !apiKey || apiKey === DEFAULT_API_KEY;
@@ -328,6 +330,7 @@ export async function speakText({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, model, speed, expressivity }),
+      signal,
     });
     if (!res.ok) throw new Error(`Deepgram TTS proxy failed: ${await res.text()}`);
     return res.blob();
@@ -340,25 +343,108 @@ export async function speakText({
     method: "POST",
     headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
+    signal,
   });
   if (!response.ok) throw new Error(`Deepgram TTS failed: ${await response.text()}`);
   return response.blob();
 }
 
-export function playAudioBlob(blob: Blob): HTMLAudioElement {
+let currentAudio: HTMLAudioElement | null = null;
+let speechSeq = 0;
+
+function stopCurrentAudio() {
+  if (currentAudio) {
+    const stopped = currentAudio;
+    currentAudio = null;
+    stopped.onended = null;
+    stopped.onerror = null;
+    try {
+      stopped.pause();
+    } catch {
+      void 0;
+    }
+    if (stopped.src.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(stopped.src);
+      } catch {
+        void 0;
+      }
+    }
+  }
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    void 0;
+  }
+}
+
+export async function playAudioBlob(blob: Blob): Promise<HTMLAudioElement> {
+  stopCurrentAudio();
   const audioUrl = URL.createObjectURL(blob);
   const audio = new Audio(audioUrl);
-  audio.onended = () => URL.revokeObjectURL(audioUrl);
-  audio.onerror = () => URL.revokeObjectURL(audioUrl);
-  const p = audio.play();
-  if (p && typeof p.catch === "function") {
-    p.catch((err: Error) => {
-      console.warn("[TTS] Audio autoplay blocked, unlocking via user gesture:", err?.message);
+  currentAudio = audio;
+  const cleanup = () => {
+    try {
       URL.revokeObjectURL(audioUrl);
-      throw err;
-    });
+    } catch {
+      void 0;
+    }
+    if (currentAudio === audio) currentAudio = null;
+  };
+  audio.onended = () => {
+    console.log("[TTS] playback ended");
+    cleanup();
+  };
+  audio.onerror = () => {
+    console.error("[TTS] audio element error, url revoked");
+    cleanup();
+  };
+  try {
+    await audio.play();
+  } catch (err) {
+    cleanup();
+    if ((err as Error)?.name === "AbortError") {
+      console.log("[TTS] play() superseded by newer speech, stopped");
+    } else {
+      console.error("[TTS] play() rejected:", (err as Error)?.name, (err as Error)?.message);
+    }
+    throw err;
   }
   return audio;
+}
+
+async function speakTextWithRetry(args: {
+  text: string;
+  apiKey?: string;
+  model?: string;
+  speed?: number;
+  expressivity?: number;
+  signal?: AbortSignal;
+}): Promise<Blob> {
+  try {
+    return await speakText(args);
+  } catch (err) {
+    if (args.signal?.aborted) throw err;
+    console.warn("[TTS] fetch failed, retrying once:", (err as Error)?.message);
+    await new Promise((r) => setTimeout(r, 600));
+    if (args.signal?.aborted) throw err;
+    return speakText(args);
+  }
+}
+
+let ttsAbort: AbortController | null = null;
+
+export function warmSpeechVoices() {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    const unlock = new SpeechSynthesisUtterance(" ");
+    unlock.volume = 0;
+    window.speechSynthesis.speak(unlock);
+  } catch {
+    void 0;
+  }
 }
 
 export async function speakNodeRedText({
@@ -374,26 +460,70 @@ export async function speakNodeRedText({
   speed?: number;
   expressivity?: number;
 }): Promise<HTMLAudioElement | SpeechSynthesisUtterance | null> {
-  if (!text) return null;
-
+  const clean = text?.trim();
+  if (!clean) {
+    console.error("[TTS] speak called with empty text, ignoring");
+    return null;
+  }
+  console.log("[TTS] request", clean.length, "chars, model:", model);
+  const turn = ++speechSeq;
+  const superseded = () => turn !== speechSeq;
   try {
-    const blob = await speakText({ text, apiKey, model, speed, expressivity });
-    try {
-      const audio = playAudioBlob(blob);
-      return audio;
-    } catch (playErr) {
-      console.warn("[TTS] play() blocked, fallback to speechSynthesis:", playErr);
-      return browserSpeakFallback(text);
+    ttsAbort?.abort();
+  } catch {
+    void 0;
+  }
+  ttsAbort = new AbortController();
+  const signal = ttsAbort.signal;
+  const aborted = () => signal.aborted || superseded();
+  let blob: Blob;
+  try {
+    const started = Date.now();
+    blob = await speakTextWithRetry({ text: clean, apiKey, model, speed, expressivity, signal });
+    if (aborted()) {
+      console.log("[TTS] superseded after fetch, dropping");
+      return null;
     }
+    console.log("[TTS] audio received", blob.size, "bytes in", Date.now() - started, "ms");
   } catch (err) {
-    console.warn("[TTS] Deepgram failed, fallback to browser:", (err as Error)?.message);
-    return browserSpeakFallback(text);
+    if (aborted()) {
+      console.log("[TTS] superseded fetch aborted, dropping");
+      return null;
+    }
+    console.error("[TTS] fetch failed after retry:", (err as Error)?.message, "| text:", clean.slice(0, 80));
+    return browserSpeakFallback(clean, "fetch-failed");
+  }
+  if (!blob || blob.size === 0) {
+    if (aborted()) return null;
+    console.error("[TTS] empty audio blob, fallback to speechSynthesis");
+    return browserSpeakFallback(clean, "empty-blob");
+  }
+  try {
+    const audio = await playAudioBlob(blob);
+    if (aborted()) {
+      console.log("[TTS] superseded during play, stopping");
+      try {
+        audio.pause();
+      } catch {
+        void 0;
+      }
+      return null;
+    }
+    console.log("[TTS] playing:", clean.slice(0, 80));
+    return audio;
+  } catch (playErr) {
+    if (aborted()) {
+      console.log("[TTS] superseded play rejected, skip fallback");
+      return null;
+    }
+    console.error("[TTS] play() failed, fallback to speechSynthesis:", (playErr as Error)?.message);
+    return browserSpeakFallback(clean, "play-failed");
   }
 }
 
-function browserSpeakFallback(text: string): SpeechSynthesisUtterance | null {
+function browserSpeakFallback(text: string, reason: string): SpeechSynthesisUtterance | null {
   if (!("speechSynthesis" in window)) {
-    console.error("[TTS] speechSynthesis not supported and Deepgram failed");
+    console.error("[TTS] speechSynthesis not supported, Deepgram failed, reason:", reason);
     return null;
   }
   try {
@@ -405,8 +535,11 @@ function browserSpeakFallback(text: string): SpeechSynthesisUtterance | null {
   u.rate = 1;
   u.pitch = 1;
   u.volume = 1;
-  u.onstart = () => console.log("[TTS] browser fallback started:", text.slice(0, 40));
-  u.onerror = (e) => console.error("[TTS] browser fallback error:", e);
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) console.error("[TTS] no speechSynthesis voices loaded, fallback may be silent, reason:", reason);
+  u.onstart = () => console.log("[TTS] browser fallback started (" + reason + "):", text.slice(0, 40));
+  u.onend = () => console.log("[TTS] browser fallback ended");
+  u.onerror = (e) => console.error("[TTS] browser fallback error:", e.error || e.type);
   window.speechSynthesis.speak(u);
   return u;
 }

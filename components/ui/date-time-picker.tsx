@@ -19,7 +19,10 @@ function parseIST(v: string): Date {
   const d = new Date(v);
   return isNaN(d.getTime()) ? new Date() : d;
 }
-function formatIST(d: Date): string {
+function formatISO(d: Date): string {
+  return d.toISOString();
+}
+function formatLabel(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
@@ -55,7 +58,7 @@ export function DateTimePicker({ value, onChange, disabled = false }: Props) {
     let h24 = hour % 12; if (ampm === "PM") h24 += 12; if (ampm === "AM" && hour === 12) h24 = 0;
     const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h24, minute);
     setSelected(next);
-    onChange(formatIST(next));
+    onChange(formatISO(next));
     setOpen(false);
   };
 
@@ -72,7 +75,7 @@ export function DateTimePicker({ value, onChange, disabled = false }: Props) {
         aria-label="Pick date and time"
       >
         <span className="flex items-center gap-2" style={{ color: "var(--ink)", fontSize: 13, fontWeight: 600 }}>
-          <Calendar size={14} style={{ color: "#60a5fa" }} /> {value || "Pick date & time"}
+          <Calendar size={14} style={{ color: "#60a5fa" }} /> {value ? formatLabel(parseIST(value)) : "Pick date & time"}
         </span>
         <Clock3 size={14} style={{ color: "var(--ink-subtle)" }} />
       </button>
@@ -127,7 +130,7 @@ export function DateTimePicker({ value, onChange, disabled = false }: Props) {
                 ))}
               </div>
             </div>
-            <button type="button" onClick={() => { let h24 = hour % 12; if (ampm === "PM") h24 += 12; if (ampm === "AM" && hour === 12) h24 = 0; const nd = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), h24, minute); setSelected(nd); onChange(formatIST(nd)); setOpen(false); }} className="rounded-md px-2.5 py-1 text-[11px] font-bold shrink-0" style={{ background: "#3b82f6", color: "white" }}>Set</button>
+            <button type="button" onClick={() => { let h24 = hour % 12; if (ampm === "PM") h24 += 12; if (ampm === "AM" && hour === 12) h24 = 0; const nd = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), h24, minute); setSelected(nd); onChange(formatISO(nd)); setOpen(false); }} className="rounded-md px-2.5 py-1 text-[11px] font-bold shrink-0" style={{ background: "#3b82f6", color: "white" }}>Set</button>
           </div>
         </div>
       )}

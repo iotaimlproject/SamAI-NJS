@@ -34,6 +34,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
   const committedRef = useRef("");
   const interimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deepgramFailsRef = useRef(0);
   const [resolvedKey, setResolvedKey] = useState("");
 
   useEffect(() => {
@@ -128,9 +129,14 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
     }
 
     setListening(true);
+    deepgramFailsRef.current = 0;
     let active = true;
     const activeRef = { current: true };
     let finalDebounce: ReturnType<typeof setTimeout> | null = null;
+    const deepgramDelay = () => {
+      const fails = deepgramFailsRef.current;
+      return fails <= 2 ? 500 : Math.min(30000, 5000 * (fails - 2));
+    };
 
     const tryDeepgram = resolvedKey && resolvedKey.length >= 10;
     if (!tryDeepgram) {
@@ -154,12 +160,24 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         apiKey: resolvedKey,
         onOpen: () => {
           if (!active) return;
+          deepgramFailsRef.current = 0;
+          const rec = recognitionRef.current;
+          recognitionRef.current = null;
+          if (rec) {
+            try {
+              rec.onend = null;
+            } catch {}
+            try {
+              rec.abort();
+            } catch {}
+          }
           setListening(true);
         },
         onTranscript: ({ transcript, isFinal, speechFinal }) => {
           if (!active || !transcript) return;
           const cleaned = transcript.trim();
           if (!cleaned) return;
+          deepgramFailsRef.current = 0;
           if (isFinal || speechFinal) {
             if (finalDebounce) clearTimeout(finalDebounce);
             finalDebounce = setTimeout(() => {
@@ -190,10 +208,13 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         onClose: () => {
           if (!active || !activeRef.current) return;
           if (recognitionRef.current) return;
+          deepgramFailsRef.current += 1;
+          const delay = deepgramDelay();
+          if (deepgramFailsRef.current > 2) console.warn("[STT] Deepgram reconnect backing off, next try in", delay, "ms");
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = setTimeout(() => {
             if (active && activeRef.current && enabled) connectDeepgram();
-          }, 500);
+          }, delay);
         },
       })
         .then((session) => {

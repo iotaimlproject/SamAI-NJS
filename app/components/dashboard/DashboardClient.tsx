@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,13 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Led } from "@/components/ui/led";
 import { Sun, Moon } from "lucide-react";
 import { handleSpeakResponse } from "@/lib/voiceService";
+import { warmSpeechVoices } from "@/lib/deepgram";
 import { useVoiceCapture } from "@/hooks/useVoiceCapture";
 import { NODE_RED_WS_PATHS, closeNodeRedSocket, getNodeRedSocket, sendNodeRedMessage } from "@/lib/nodeRedWebSocket";
+
+function cleanItem(v: string): string {
+  return v.replace(/^\d+\s*[·\-–:]\s*/, "").trim();
+}
 
 function getGaugeColor(v: number): string {
   if (v >= 100) return "#22c55e";
@@ -78,15 +83,16 @@ export default function DashboardClient() {
   const [performance, setPerformance] = useState(97);
   const [quality, setQuality] = useState(100);
   const [slNo, setSlNo] = useState(1);
-  const [item, setItem] = useState("Solid_Plate");
+  const [item, setItem] = useState("");
+  const [itemList, setItemList] = useState<Array<{ slNo: number; item: string }>>([]);
   const [setQty, setSetQty] = useState(3);
-  const [dateTime, setDateTime] = useState("03-09-2026 07:20 PM");
+  const [dateTime, setDateTime] = useState("2026-09-05T19:12:00.000Z");
   const [placeOrder, setPlaceOrder] = useState(true);
   const [qtyReq, setQtyReq] = useState(3);
   const [rmQty, setRmQty] = useState(1);
   const [produced, setProduced] = useState(3);
 
-  const [productionOn, setProductionOn] = useState(true);
+  const [productionOn, setProductionOn] = useState(false);
 
   const [plannedAt, setPlannedAt] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
@@ -125,6 +131,7 @@ export default function DashboardClient() {
       stopVoiceCapture();
       setMicActive(false);
     } else {
+      warmSpeechVoices();
       setMicActive(true);
     }
   };
@@ -293,13 +300,11 @@ export default function DashboardClient() {
         try {
           const p = JSON.parse(e.data);
           const m = (p.value ?? p.payload ?? p) as Record<string, unknown>;
-          if (typeof m.slNo === "number") setSlNo(m.slNo as number);
-          if (typeof m.item === "string") setItem(m.item as string);
+          if (typeof m.item === "string") setItem(cleanItem(m.item as string));
           if (typeof m.setQty === "number") setSetQty(m.setQty as number);
           if (typeof m.dateTime === "string") setDateTime(m.dateTime as string);
           if ((p.device === "order" || p.device === "orderData") && m) {
-            if (typeof m.slNo === "number") setSlNo(m.slNo as number);
-            if (typeof m.item === "string") setItem(m.item as string);
+            if (typeof m.item === "string") setItem(cleanItem(m.item as string));
           }
         } catch {}
       },
@@ -307,11 +312,73 @@ export default function DashboardClient() {
     return () => closeNodeRedSocket(NODE_RED_WS_PATHS.orderData);
   }, []);
 
-  const handleSubmit = () => {
-    const next = new Date(dateTime);
+  const requestItemList = () => {
+    console.log("[App] /ws/itemlist request list");
+    sendNodeRedMessage(NODE_RED_WS_PATHS.itemlist, { device: "itemlist", value: { action: "list" } });
+  };
+
+  const itemBySlNo = useMemo(() => new Map(itemList.map((e) => [e.slNo, e.item] as const)), [itemList]);
+
+  const selectItem = useCallback((v: number) => {
+    if (!Number.isFinite(v)) return;
+    const hit = itemBySlNo.get(v);
+    const label = hit !== undefined ? cleanItem(hit) : item;
+    if (v === slNo && label === item) return;
+    setSlNo(v);
+    if (hit !== undefined) setItem(label);
+    sendNodeRedMessage(NODE_RED_WS_PATHS.slno, { device: "slno", value: { slNo: v, item: label } });
+  }, [itemBySlNo, slNo, item]);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.itemlist, {
+      onopen: () => { console.log("[App] /ws/itemlist connected"); requestItemList(); },
+      onmessage: (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          const m = (p.value ?? p.payload ?? p) as Record<string, unknown>;
+          const arr = (m.items ?? []) as Array<{ slNo: number; item: string }>;
+          if (Array.isArray(arr)) {
+            const clean = arr.filter((r) => r && typeof r.slNo === "number" && typeof r.item === "string");
+            console.log("[App] /ws/itemlist reply", clean.length, "items");
+            setItemList(clean);
+          }
+        } catch {}
+      },
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.itemlist);
+  }, []);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.slno, {
+      onopen: () => console.log("[App] /ws/slno connected (duplex)"),
+      onmessage: (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          if (p.device !== undefined && p.device !== "slno") return;
+          const m = (p.value ?? p.payload ?? p) as Record<string, unknown>;
+          if (typeof m.slNo === "number") setSlNo(m.slNo as number);
+          if (typeof m.item === "string") setItem(cleanItem(m.item as string));
+        } catch {}
+      },
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.slno);
+  }, []);
+
+  const handleSubmit = () => {    let next = new Date(dateTime);
+    if (Number.isNaN(next.getTime())) {
+      const m = dateTime.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (m) {
+        let hh = parseInt(m[4], 10);
+        const ap = (m[6] || "").toUpperCase();
+        if (ap === "PM" && hh < 12) hh += 12;
+        if (ap === "AM" && hh === 12) hh = 0;
+        next = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), hh, parseInt(m[5], 10));
+      }
+    }
+    if (Number.isNaN(next.getTime())) next = new Date();
     setPlannedAt(next);
     setQtyReq(setQty);
-    const orderPayload = { device: "orderData", value: { slNo, item, setQty, dateTime, plannedAt: next.toISOString() } };
+    const orderPayload = { device: "orderData", value: { item, setQty, dateTime, plannedAt: next.toISOString() } };
     sendNodeRedMessage(NODE_RED_WS_PATHS.orderData, orderPayload);
     sendNodeRedMessage(NODE_RED_WS_PATHS.dateTime, { device: "dateTime", value: dateTime });
   };
@@ -376,7 +443,7 @@ export default function DashboardClient() {
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", color: "var(--ink)", textTransform: "uppercase" }}>Machine</span>
               <Switch
                 checked={machineOn}
-                onCheckedChange={(v) => { setMachineOn(v); sendNodeRedMessage(NODE_RED_WS_PATHS.machine, { device: "machine", value: { power: v } }); }}
+                onCheckedChange={(v) => { setMachineOn(v); setProductionOn(false); sendNodeRedMessage(NODE_RED_WS_PATHS.machine, { device: "machine", value: { power: v } }); }}
                 aria-label="Machine"
                 className="data-[state=checked]:bg-[#22c55e]"
               />
@@ -421,16 +488,15 @@ export default function DashboardClient() {
 
         {}
         <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "visible", padding: "14px 12px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr 1fr", gap: 10, alignItems: "end" }}>
-            <div>
-              <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Sl No.</Label>
-              <Input type="number" value={slNo} onChange={(e) => setSlNo(Number(e.target.value) || 1)} disabled={!machineOn} className="h-9 rounded-lg border px-3 text-sm mono-readout font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }} />
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 10, alignItems: "end" }}>
             <div>
               <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Item</Label>
-              <Select value={item} onValueChange={(v) => setItem(v)} disabled={!machineOn}>
-                <SelectTrigger className="h-9 rounded-lg border px-3 text-sm font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }}><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Solid_Plate">1 · Solid_Plate</SelectItem><SelectItem value="Hollow_Plate">2 · Hollow_Plate</SelectItem><SelectItem value="Bracket">3 · Bracket</SelectItem></SelectContent>
+              <Select value={item ? String(slNo) : ""} onValueChange={(v) => { if (v !== "__empty") selectItem(Number(v)); }} onOpenChange={(o) => { if (o) requestItemList(); }} disabled={!machineOn}>
+                <SelectTrigger className="h-9 rounded-lg border px-3 text-sm font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }}><SelectValue placeholder="Select item" /></SelectTrigger>
+                <SelectContent style={{ background: "var(--panel)", borderColor: "var(--hairline)" }}>
+                  {itemList.length === 0 && <SelectItem value="__empty" disabled>No items</SelectItem>}
+                  {itemList.map((e) => <SelectItem key={e.slNo} value={String(e.slNo)}>{cleanItem(e.item)}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div>

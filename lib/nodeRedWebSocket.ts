@@ -28,6 +28,8 @@ export const NODE_RED_WS_PATHS = {
   joints: "/ws/joints",
   telemetry: "/ws/telemetry",
   orderData: "/ws/orderData",
+  slno: "/ws/slno",
+  itemlist: "/ws/itemlist",
   dateTime: "/ws/dateTime",
   placeOrder: "/ws/placeOrder",
   stop: "/ws/stop",
@@ -45,6 +47,8 @@ export const NODE_RED_WS_URLS = {
   joints: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.joints, host),
   telemetry: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.telemetry, host),
   orderData: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.orderData, host),
+  slno: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.slno, host),
+  itemlist: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.itemlist, host),
   dateTime: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.dateTime, host),
   placeOrder: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.placeOrder, host),
   stop: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.stop, host),
@@ -60,6 +64,16 @@ export type SocketHandlers = {
   onclose?: (_event?: CloseEvent) => void;
 };
 
+const CONNECT_SPACING = 150;
+let nextConnectSlot = 0;
+
+function reserveConnectSlot(): number {
+  const now = Date.now();
+  const slot = Math.max(now, nextConnectSlot);
+  nextConnectSlot = slot + CONNECT_SPACING;
+  return slot - now;
+}
+
 class SocketConnection {
   path: string;
   socket: WebSocket | null = null;
@@ -67,6 +81,7 @@ class SocketConnection {
   attempts = 0;
   closedManually = false;
   connecting = false;
+  pendingConnect: ReturnType<typeof setTimeout> | null = null;
   currentHost: Host = NODE_RED_HOSTS.production;
 
   constructor(path: string) {
@@ -84,10 +99,35 @@ class SocketConnection {
   connect(): WebSocket | null {
     if (typeof window === "undefined" || typeof WebSocket === "undefined") return null;
     if (this.socket?.readyState === WebSocket.OPEN) return this.socket;
+    if (this.socket && (this.socket.readyState === WebSocket.CLOSED || this.socket.readyState === WebSocket.CLOSING)) {
+      this.socket = null;
+      this.connecting = false;
+    }
     if (this.socket?.readyState === WebSocket.CONNECTING || this.connecting) return this.socket;
 
     this.closedManually = false;
     this.connecting = true;
+    const wait = reserveConnectSlot();
+    if (wait <= 0) return this.openSocket();
+    if (this.pendingConnect) clearTimeout(this.pendingConnect);
+    this.pendingConnect = setTimeout(() => {
+      this.pendingConnect = null;
+      if (this.closedManually) {
+        this.connecting = false;
+        return;
+      }
+      this.openSocket();
+    }, wait);
+    return null;
+  }
+
+  openSocket(): WebSocket | null {
+    if (typeof window === "undefined" || typeof WebSocket === "undefined") return null;
+    if (this.closedManually) {
+      this.connecting = false;
+      return null;
+    }
+    if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return this.socket;
     const url = this.getUrl();
     this.socket = new WebSocket(url);
     this.socket.onopen = () => this.onOpen();
@@ -114,6 +154,9 @@ class SocketConnection {
         } catch {
           void 0;
         }
+        this.socket = null;
+        this.connecting = false;
+        if (!this.closedManually) this.scheduleReconnect();
       }
     }, RECONNECT.timeout);
     timeoutIds.set(key, id);
@@ -194,6 +237,7 @@ class SocketConnection {
       }
     }
     this.queue(payload);
+    if (!this.connecting && !this.closedManually) this.connect();
     return false;
   }
 
@@ -206,6 +250,10 @@ class SocketConnection {
 
   close() {
     this.closedManually = true;
+    if (this.pendingConnect) {
+      clearTimeout(this.pendingConnect);
+      this.pendingConnect = null;
+    }
     const key = `${this.path}-${this.currentHost.host}`;
     const timer = reconnectTimers.get(key);
     if (timer) {
