@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MicFrequency, MicButton } from "@/components/ui/mic-frequency";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Led } from "@/components/ui/led";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Minus, Plus } from "lucide-react";
 import { handleSpeakResponse } from "@/lib/voiceService";
 import { warmSpeechVoices } from "@/lib/deepgram";
 import { normalizePopup, type PopupData } from "@/lib/popupFormat";
@@ -566,7 +566,11 @@ export default function DashboardClient() {
             </div>
             <div>
               <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Set Qty</Label>
-              <Input type="number" value={setQty} onChange={(e) => setSetQty(Number(e.target.value) || 0)} disabled={!machineOn} className="h-9 rounded-lg border px-3 text-sm mono-readout font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }} />
+              <div className="h-9 rounded-lg border flex items-stretch overflow-hidden disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)" }}>
+                <button type="button" aria-label="Decrease quantity" disabled={!machineOn} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) - 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderRight: "1px solid var(--hairline)" }}><Minus size={14} /></button>
+                <Input type="number" value={setQty} onChange={(e) => setSetQty(Number(e.target.value) || 0)} disabled={!machineOn} className="h-full border-0 px-1 text-sm mono-readout font-semibold text-center disabled:opacity-50" style={{ background: "transparent", color: "var(--ink)", boxShadow: "none" }} />
+                <button type="button" aria-label="Increase quantity" disabled={!machineOn} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) + 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderLeft: "1px solid var(--hairline)" }}><Plus size={14} /></button>
+              </div>
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
