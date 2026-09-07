@@ -82,7 +82,7 @@ export function DateTimePicker({ value, onChange, disabled = false }: Props) {
 
       {open && (
         <div
-          className="absolute z-50 mt-2 rounded-xl border p-2.5 shadow-2xl left-0 right-0 mx-auto"
+          className="absolute z-50 mt-2 rounded-xl border p-2.5 shadow-2xl left-0 right-0 mx-auto picker-pop"
           style={{ background: "var(--panel)", borderColor: "var(--hairline)", boxShadow: "0 12px 32px rgba(0,0,0,0.55)", width: "min(260px, calc(100vw - 24px))", left: "50%", transform: "translateX(-50%)" }}
         >
           <div className="flex items-center justify-between mb-2">

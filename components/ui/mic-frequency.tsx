@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-export function MicFrequency({ active, className }: { active: boolean; className?: string }) {
+export function MicFrequency({ active, thinking = false, className }: { active: boolean; thinking?: boolean; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -123,7 +123,7 @@ export function MicFrequency({ active, className }: { active: boolean; className
       />
       <div className="flex items-center justify-between px-1">
         <span className="micro-label" style={{ fontSize: 8, color: active ? "var(--cyan)" : "var(--ink-faint)" }}>
-          {active ? "Live • 16 bands • real-time" : "Idle • tap mic"}
+          {thinking ? (<>Thinking • AI processing<span className="thinking-ellipsis" /></>) : active ? ("Live • 16 bands • real-time") : ("Idle • tap mic")}
         </span>
         <span className={`dot ${active ? "dot--cyan" : "dot--muted"}`} style={{ width: 6, height: 6 }} />
       </div>

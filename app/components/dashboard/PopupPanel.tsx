@@ -4,8 +4,8 @@ import type { PopupData } from "@/lib/popupFormat";
 
 export function PopupPanel({ popup, onClose }: { popup: PopupData; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.68)" }} onClick={onClose} role="dialog" aria-modal="true" aria-label={popup.title}>
-      <div className="w-full flex flex-col overflow-hidden" style={{ maxWidth: 366, maxHeight: "88vh", background: "var(--panel)", border: "1px solid var(--hairline)", borderRadius: 18, boxShadow: "0 12px 40px rgba(0,0,0,0.45)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 popup-scrim" style={{ background: "rgba(0,0,0,0.68)" }} onClick={onClose} role="dialog" aria-modal="true" aria-label={popup.title}>
+      <div className="w-full flex flex-col overflow-hidden popup-card" style={{ maxWidth: 366, maxHeight: "88vh", background: "var(--panel)", border: "1px solid var(--hairline)", borderRadius: 18, boxShadow: "0 12px 40px rgba(0,0,0,0.45)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 shrink-0" style={{ padding: "14px 14px 12px 16px", background: "var(--module)", borderBottom: "1px solid var(--hairline)" }}>
           <div className="min-w-0">
             <p className="truncate" style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "var(--ink)", textTransform: "uppercase" }}>{popup.title}</p>

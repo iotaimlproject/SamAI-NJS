@@ -576,3 +576,63 @@ select option {
   background-color: var(--panel);
   color: var(--ink);
 }
+
+/* Micro-motion — press feedback everywhere (transform/opacity only) */
+button:not(:disabled) {
+  transition: transform 0.12s ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.95);
+}
+.led {
+  transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.led-label {
+  transition: color 0.25s ease;
+}
+.popup-scrim {
+  animation: popup-fade 0.18s ease;
+}
+.popup-card {
+  animation: popup-pop 0.24s cubic-bezier(0.2, 0.9, 0.25, 1.15);
+}
+@keyframes popup-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes popup-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.picker-pop {
+  animation: picker-in 0.16s ease;
+  transform-origin: top center;
+}
+@keyframes picker-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.thinking-ellipsis::after {
+  content: "";
+  animation: thinking-dots 1.2s steps(4) infinite;
+}
+@keyframes thinking-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active {
+    transform: none;
+  }
+  .popup-scrim,
+  .popup-card,
+  .picker-pop {
+    animation: none;
+  }
+  .thinking-ellipsis::after {
+    animation: none;
+    content: "...";
+  }
+}

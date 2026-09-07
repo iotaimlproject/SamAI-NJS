@@ -49,7 +49,7 @@ function Gauge({ value, accent, size = 84, highlight = false }: { value: number;
           const y2 = cx + (r + 4) * Math.sin(a);
           return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--ink-faint)" strokeWidth={i % 3 === 0 ? 0.9 : 0.5} opacity={i % 3 === 0 ? 0.9 : 0.35} />;
         })}
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={highlight ? 2.2 : 1.6} strokeLinecap="round" strokeDasharray={`${dash} ${c - dash}`} style={{ opacity: 0.95 }} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={highlight ? 2.2 : 1.6} strokeLinecap="round" strokeDasharray={`${dash} ${c - dash}`} style={{ opacity: 0.95, transition: "stroke-dasharray 0.6s ease, stroke 0.3s ease" }} />
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span className="mono-readout" style={{ fontSize: highlight ? 18 : 16, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em" }}>{Math.round(pct)}</span>
@@ -88,7 +88,7 @@ export default function DashboardClient() {
   const [item, setItem] = useState("");
   const [itemList, setItemList] = useState<Array<{ slNo: number; item: string }>>([]);
   const [setQty, setSetQty] = useState(3);
-  const [dateTime, setDateTime] = useState("2026-09-05T19:12:00.000Z");
+  const [dateTime, setDateTime] = useState(() => new Date().toISOString());
   const [placeOrder, setPlaceOrder] = useState(true);
   const [qtyReq, setQtyReq] = useState(3);
   const [rmQty, setRmQty] = useState(1);
@@ -99,6 +99,7 @@ export default function DashboardClient() {
   const [plannedAt, setPlannedAt] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [stop, setStop] = useState(false);
+  const [resetHeld, setResetHeld] = useState(false);
   const [perPartRs, setPerPartRs] = useState(2000);
   const [_plannedRs] = useState(6000);
   const [badParts, setBadParts] = useState(0);
@@ -111,6 +112,8 @@ export default function DashboardClient() {
   const [logFilter, setLogFilter] = useState<"all" | "info" | "warn" | "error">("all");
   const [logSearch, setLogSearch] = useState("");
   const [micActive, setMicActive] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const thinkingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popup, setPopup] = useState<PopupData | null>(null);
   const popupRef = useRef<PopupData | null>(null);
   const popupMicOffArmed = useRef(false);
@@ -153,6 +156,9 @@ export default function DashboardClient() {
         popupMicOffArmed.current = true;
         console.log("[App] thank-you heard, mic off after voice");
       }
+      setThinking(true);
+      if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
+      thinkingTimer.current = setTimeout(() => setThinking(false), 25000);
       sendNodeRedMessage(NODE_RED_WS_PATHS.speak, { device: "speak", value: transcript, text: transcript, source: "dashboard" });
     },
   });
@@ -160,6 +166,8 @@ export default function DashboardClient() {
     if (micActive) {
       stopVoiceCapture();
       setMicActive(false);
+      setThinking(false);
+      if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
     } else {
       warmSpeechVoices();
       setMicActive(true);
@@ -217,6 +225,8 @@ export default function DashboardClient() {
         const p = payload as Record<string, unknown>;
         const text = (p?.value ?? p?.text ?? p?.payload ?? (typeof payload === "string" ? payload : "")) as string;
         if (text && typeof text === "string") setMicInput(text);
+        setThinking(false);
+        if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
         await handleSpeakResponse(payload, onTtsSpoke);
       },
       onerror: (e) => { const hasDetail = e && typeof e === "object" && Object.keys(e as object).length > 0; if (hasDetail) console.debug("[App /ws/voice] note:", e); },
@@ -356,6 +366,7 @@ export default function DashboardClient() {
     if (v === slNo && label === item) return;
     setSlNo(v);
     if (hit !== undefined) setItem(label);
+    console.log("[App] /ws/slno send", v, label);
     sendNodeRedMessage(NODE_RED_WS_PATHS.slno, { device: "slno", value: { slNo: v, item: label } });
   }, [itemBySlNo, slNo, item]);
 
@@ -432,9 +443,13 @@ export default function DashboardClient() {
     sendNodeRedMessage(NODE_RED_WS_PATHS.orderData, orderPayload);
     sendNodeRedMessage(NODE_RED_WS_PATHS.dateTime, { device: "dateTime", value: dateTime });
   };
-  const handleReset = () => {
-    setBadParts(0); _setLoss(0); setStop(false);
-    sendNodeRedMessage(NODE_RED_WS_PATHS.reset, { device: "reset", value: true });
+  const sendResetHold = (v: boolean) => {
+    setResetHeld(v);
+    if (v) {
+      setBadParts(0); _setLoss(0); setStop(false);
+    }
+    console.log("[App] /ws/reset send", v);
+    sendNodeRedMessage(NODE_RED_WS_PATHS.reset, { device: "reset", value: v });
   };
 
   if (!mounted) return <div className="page" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--canvas)" }}><div className="mobile-shell" style={{ width: "100%", maxWidth: 390, margin: "0 auto", minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--canvas)", borderLeft: "1px solid var(--hairline)", borderRight: "1px solid var(--hairline)", boxSizing: "border-box" }}><p className="eyebrow" style={{ textAlign: "center" }}>Initializing…</p></div></div>;
@@ -581,7 +596,19 @@ export default function DashboardClient() {
             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", letterSpacing: "0.01em" }}>Stop</span>
             <Switch checked={stop} onCheckedChange={(v) => { setStop(v); sendNodeRedMessage(NODE_RED_WS_PATHS.stop, { device: "stop", value: v }); }} disabled={!machineOn} className="data-[state=checked]:bg-[#ef4444] disabled:opacity-50" aria-label="Stop" />
           </div>
-          <Button onClick={handleReset} disabled={!machineOn} className="h-10 px-8 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "#22c55e", color: "white", borderRadius: 10, minWidth: 92, border: "1px solid #16a34a", boxShadow: "none" }}>Reset</Button>
+          <Button
+            disabled={!machineOn}
+            onPointerDown={(e) => { e.preventDefault(); if (machineOn && !resetHeld) sendResetHold(true); }}
+            onPointerUp={() => { if (resetHeld) sendResetHold(false); }}
+            onPointerLeave={() => { if (resetHeld) sendResetHold(false); }}
+            onPointerCancel={() => { if (resetHeld) sendResetHold(false); }}
+            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && machineOn && !resetHeld && !e.repeat) sendResetHold(true); }}
+            onKeyUp={() => { if (resetHeld) sendResetHold(false); }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Reset (hold)"
+            className="h-10 px-8 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed select-none"
+            style={{ background: "#22c55e", color: "white", borderRadius: 10, minWidth: 92, border: "1px solid #16a34a", transform: resetHeld ? "translateY(2px) scale(0.98)" : "none", filter: resetHeld ? "brightness(0.9)" : "none", boxShadow: resetHeld ? "inset 0 2px 6px rgba(0,0,0,0.35)" : "0 3px 0 #15803d, 0 6px 14px rgba(0,0,0,0.35)", touchAction: "none", transition: "box-shadow 0.12s ease, transform 0.12s ease, filter 0.12s ease" }}
+          >Reset</Button>
         </div>
 
         {}
@@ -785,15 +812,15 @@ export default function DashboardClient() {
           <div className="instrument" style={{ background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 -2px 20px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.35)", borderRadius: 12, overflow: "hidden", padding: "12px 14px", pointerEvents: "auto" }}>
             <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
               <span className="micro-label">Operator Command · Voice</span>
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: isListening ? "var(--green)" : "var(--ink-subtle)" }}>
-                <span className={`dot ${isListening ? "dot--green" : "dot--muted"}`} style={{ width: 6, height: 6 }} />
-                {isListening ? "Listening" : "Idle"}
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: thinking ? "var(--cyan)" : isListening ? "var(--green)" : "var(--ink-subtle)" }}>
+                <span className={`dot ${thinking ? "dot--cyan" : isListening ? "dot--green" : "dot--muted"}`} style={{ width: 6, height: 6 }} />
+                {thinking ? "Thinking" : isListening ? "Listening" : "Idle"}
               </span>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <MicButton active={isListening} onToggle={toggleMic} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <MicFrequency active={isListening} />
+                <MicFrequency active={isListening} thinking={thinking} />
               </div>
             </div>
             {micText ? (
