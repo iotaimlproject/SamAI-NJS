@@ -80,19 +80,19 @@ export default function DashboardClient() {
   }, [theme, mounted]);
 
   const [machineOn, setMachineOn] = useState(true);
-  const [oee, setOee] = useState(97);
-  const [availability, setAvailability] = useState(100);
-  const [performance, setPerformance] = useState(97);
-  const [quality, setQuality] = useState(100);
-  const [slNo, setSlNo] = useState(1);
+  const [oee, setOee] = useState(0);
+  const [availability, setAvailability] = useState(0);
+  const [performance, setPerformance] = useState(0);
+  const [quality, setQuality] = useState(0);
+  const [slNo, setSlNo] = useState(0);
   const [item, setItem] = useState("");
   const [itemList, setItemList] = useState<Array<{ slNo: number; item: string }>>([]);
-  const [setQty, setSetQty] = useState(3);
+  const [setQty, setSetQty] = useState(0);
   const [dateTime, setDateTime] = useState(() => new Date().toISOString());
   const [placeOrder, setPlaceOrder] = useState(true);
-  const [qtyReq, setQtyReq] = useState(3);
-  const [rmQty, setRmQty] = useState(1);
-  const [produced, setProduced] = useState(3);
+  const [qtyReq, setQtyReq] = useState(0);
+  const [rmQty, setRmQty] = useState(0);
+  const [produced, setProduced] = useState(0);
 
   const [productionOn, setProductionOn] = useState(false);
 
@@ -100,8 +100,8 @@ export default function DashboardClient() {
   const [now, setNow] = useState<Date | null>(null);
   const [stop, setStop] = useState(false);
   const [resetHeld, setResetHeld] = useState(false);
-  const [perPartRs, setPerPartRs] = useState(2000);
-  const [_plannedRs] = useState(6000);
+  const [perPartRs, setPerPartRs] = useState(0);
+  const [_plannedRs] = useState(0);
   const [badParts, setBadParts] = useState(0);
   const [_loss, _setLoss] = useState(0);
 
