@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { Led } from "@/components/ui/led";
 import { Sun, Moon } from "lucide-react";
 import { handleSpeakResponse } from "@/lib/voiceService";
 import { warmSpeechVoices } from "@/lib/deepgram";
+import { normalizePopup, type PopupData } from "@/lib/popupFormat";
+import { PopupPanel } from "@/app/components/dashboard/PopupPanel";
 import { useVoiceCapture } from "@/hooks/useVoiceCapture";
 import { NODE_RED_WS_PATHS, closeNodeRedSocket, getNodeRedSocket, sendNodeRedMessage } from "@/lib/nodeRedWebSocket";
 
@@ -109,6 +111,9 @@ export default function DashboardClient() {
   const [logFilter, setLogFilter] = useState<"all" | "info" | "warn" | "error">("all");
   const [logSearch, setLogSearch] = useState("");
   const [micActive, setMicActive] = useState(false);
+  const [popup, setPopup] = useState<PopupData | null>(null);
+  const popupRef = useRef<PopupData | null>(null);
+  const popupMicOffArmed = useRef(false);
   const [gripperAction, setGripperAction] = useState<"open" | "close" | "idle">("idle");
   const [logs, setLogs] = useState<Array<{ id: number; time: string; level: string; msg: string; meta?: string }>>(() => {
     const now = new Date();
@@ -119,10 +124,35 @@ export default function DashboardClient() {
       { id: 3, time: fmt(new Date(now.getTime() - 120000)), level: "warn", msg: "Performance 97% — within threshold", meta: "oee" },
     ];
   });
+  const applyPopup = (next: PopupData | null, why: string) => {
+    const was = popupRef.current !== null;
+    const is = next !== null;
+    popupRef.current = next;
+    setPopup(next);
+    if (was === is) {
+      if (is) console.log("[App] popup updated:", why);
+      return;
+    }
+    console.log(`[App] popup ${is ? "open" : "closed"}:`, why);
+  };
+  const onTtsSpoke = () => {
+    if (!popupMicOffArmed.current) return;
+    popupMicOffArmed.current = false;
+    console.log("[App] thank-you voice sent, mic off");
+    stopVoiceCapture();
+    setMicActive(false);
+  };
   const { listening: micListening, text: micText, setText: setMicInput, stop: stopVoiceCapture } = useVoiceCapture({
     enabled: micActive,
     onResult: async (transcript, isFinal) => {
       if (!isFinal) return;
+      const said = transcript.trim().toLowerCase().replace(/[.!?]+$/, "");
+      if (said === "ok" || said === "okay") applyPopup(null, "voice-okay");
+      if (said === "thank you" || said === "thanks" || said === "thankyou") {
+        applyPopup(null, "voice-thank-you");
+        popupMicOffArmed.current = true;
+        console.log("[App] thank-you heard, mic off after voice");
+      }
       sendNodeRedMessage(NODE_RED_WS_PATHS.speak, { device: "speak", value: transcript, text: transcript, source: "dashboard" });
     },
   });
@@ -187,7 +217,7 @@ export default function DashboardClient() {
         const p = payload as Record<string, unknown>;
         const text = (p?.value ?? p?.text ?? p?.payload ?? (typeof payload === "string" ? payload : "")) as string;
         if (text && typeof text === "string") setMicInput(text);
-        await handleSpeakResponse(payload);
+        await handleSpeakResponse(payload, onTtsSpoke);
       },
       onerror: (e) => { const hasDetail = e && typeof e === "object" && Object.keys(e as object).length > 0; if (hasDetail) console.debug("[App /ws/voice] note:", e); },
       onclose: () => console.log("[App /ws/voice] closed"),
@@ -362,6 +392,26 @@ export default function DashboardClient() {
       },
     });
     return () => closeNodeRedSocket(NODE_RED_WS_PATHS.slno);
+  }, []);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.popupdata, {
+      onopen: () => console.log("[App] /ws/popupdata connected"),
+      onmessage: (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          if (p.device !== undefined && p.device !== "popup") return;
+          const m = (p.value ?? p.payload ?? p) as Record<string, unknown>;
+          if ((m.action as string) === "close") {
+            applyPopup(null, "ws-close");
+            return;
+          }
+          const next = normalizePopup(m);
+          if (next) applyPopup(next, `ws-open ${next.rows.length} rows`);
+        } catch {}
+      },
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.popupdata);
   }, []);
 
   const handleSubmit = () => {    let next = new Date(dateTime);
@@ -762,6 +812,7 @@ export default function DashboardClient() {
           </div>
         </div>
       </div>
+      {popup && <PopupPanel popup={popup} onClose={() => applyPopup(null, "manual-x")} />}
     </div>
   );
 }

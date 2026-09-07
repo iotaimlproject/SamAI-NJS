@@ -36,7 +36,15 @@ export function normalizeVoicePayload(raw: unknown): Record<string, string> | nu
   return null;
 }
 
-export async function handleSpeakResponse(rawPayload: unknown): Promise<boolean> {
+export async function handleSpeakResponse(rawPayload: unknown, onSpoke?: () => void): Promise<boolean> {
+  const spoken = (ok: boolean) => {
+    try {
+      onSpoke?.();
+    } catch {
+      void 0;
+    }
+    return ok;
+  };
   const payload = normalizeVoicePayload(rawPayload);
   console.log("[voiceService] handleSpeakResponse raw:", rawPayload, "normalized:", payload);
   if (!payload) {
@@ -53,9 +61,9 @@ export async function handleSpeakResponse(rawPayload: unknown): Promise<boolean>
     console.log("[voiceService] Playing TTS:", text.slice(0, 80));
     const audio = await speakNodeRedText({ text });
     console.log("[voiceService] TTS started:", audio);
-    return true;
+    return spoken(true);
   } catch (err) {
     console.error("[voiceService] TTS playback failed:", err);
-    return false;
+    return spoken(false);
   }
 }

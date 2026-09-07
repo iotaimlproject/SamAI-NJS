@@ -56,6 +56,7 @@ See `.env.example` for template. `NEXT_PUBLIC_NODE_RED_HOST/PROTOCOL` optional (
 - `/ws/reset` — Production reset
 - `/ws/placeOrder` — Order placement
 - `/ws/dateTime` — Scheduled production time
+- `/ws/popupdata` — Production info popup open/close (NR → dashboard)
 
 ## Voice Pipeline
 

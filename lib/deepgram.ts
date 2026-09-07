@@ -311,7 +311,7 @@ export async function startMicrophoneStt({
 export async function speakText({
   text,
   apiKey = DEFAULT_API_KEY,
-  model = "aura-asteria-en",
+  model = "flux-priya-en",
   speed = 1,
   expressivity = 0,
   signal,
@@ -450,7 +450,7 @@ export function warmSpeechVoices() {
 export async function speakNodeRedText({
   text,
   apiKey = DEFAULT_API_KEY,
-  model = "aura-asteria-en",
+  model = "flux-priya-en",
   speed = 1,
   expressivity = 0,
 }: {

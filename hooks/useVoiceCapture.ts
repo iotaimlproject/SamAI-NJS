@@ -57,10 +57,12 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
   const startBrowserSTT = (activeRef: { current: boolean }) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
+      console.error("[STT] browser SpeechRecognition not supported and Deepgram unavailable");
       setText("Mic not supported");
       setListening(false);
       return null;
     }
+    console.log("[STT] browser SpeechRecognition fallback active");
     try {
       const rec = new SR();
       rec.continuous = true;
@@ -96,7 +98,9 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
           interimTimerRef.current = setTimeout(() => { if (activeRef.current) setInterim(""); }, 1500);
         }
       };
-      rec.onerror = () => {};
+      rec.onerror = (e) => {
+        console.error("[STT] browser recognition error:", (e as { error?: string })?.error || e);
+      };
       rec.onend = () => {
         if (activeRef.current) {
           try { rec.start(); } catch { setListening(false); }
@@ -164,12 +168,15 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
           const rec = recognitionRef.current;
           recognitionRef.current = null;
           if (rec) {
+            console.log("[STT] Deepgram live, browser fallback stopped");
             try {
               rec.onend = null;
             } catch {}
             try {
               rec.abort();
             } catch {}
+          } else {
+            console.log("[STT] Deepgram live");
           }
           setListening(true);
         },
@@ -199,6 +206,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         },
         onError: () => {
           if (active && !recognitionRef.current) {
+            console.error("[STT] Deepgram error, starting browser fallback in 600ms");
             if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
             reconnectTimerRef.current = setTimeout(() => {
               if (active && activeRef.current) startBrowserSTT(activeRef);

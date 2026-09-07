@@ -4,7 +4,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "DEEPGRAM_API_KEY not configured" }, { status: 500 });
 
-  const { text, model = "aura-asteria-en" } = await req.json();
+  const { text, model = "flux-priya-en" } = await req.json();
   if (!text?.trim()) return NextResponse.json({ error: "text required" }, { status: 400 });
 
   const isFlux = String(model).startsWith("flux-");
