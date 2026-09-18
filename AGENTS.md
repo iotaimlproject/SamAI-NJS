@@ -48,7 +48,7 @@ See `.env.example` for template. `NEXT_PUBLIC_NODE_RED_HOST/PROTOCOL` optional (
 
 ## WebSocket Endpoints
 
-- `/ws/machine` — Machine on/off state
+- `/ws/machine` — Machine switch power command + echo (`value: { power, led, production }`: switch command, POWER LED feedback, PRODUCTION feedback — independent)
 - `/ws/dashboard` — Order and production data
 - `/ws/speak` — Voice input from dashboard to Node-RED
 - `/ws/voice` — Voice output from Node-RED to dashboard

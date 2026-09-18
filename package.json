@@ -54,6 +54,10 @@
         "@typescript-eslint/*",
         "typescript-eslint"
       ]
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "unrs-resolver"
+    ]
   }
 }

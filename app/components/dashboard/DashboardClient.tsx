@@ -11,9 +11,10 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Led } from "@/components/ui/led";
 import { Sun, Moon, Minus, Plus } from "lucide-react";
 import { handleSpeakResponse } from "@/lib/voiceService";
-import { warmSpeechVoices } from "@/lib/deepgram";
+import { isSpeakingNow, subscribeSpeaking, warmSpeechVoices } from "@/lib/deepgram";
 import { normalizePopup, type PopupData } from "@/lib/popupFormat";
 import { PopupPanel } from "@/app/components/dashboard/PopupPanel";
+import { installTapRipple } from "@/lib/ripple";
 import { useVoiceCapture } from "@/hooks/useVoiceCapture";
 import { NODE_RED_WS_PATHS, closeNodeRedSocket, getNodeRedSocket, sendNodeRedMessage } from "@/lib/nodeRedWebSocket";
 
@@ -63,7 +64,11 @@ export default function DashboardClient() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
+    installTapRipple();
+    return subscribeSpeaking(setIsSpeaking);
+  }, []);
 
+  useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem("samai-theme") as "dark" | "light" | null;
     const initial = saved || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
@@ -95,11 +100,13 @@ export default function DashboardClient() {
   const [produced, setProduced] = useState(0);
 
   const [productionOn, setProductionOn] = useState(false);
+  const [powerOn, setPowerOn] = useState(false);
 
   const [plannedAt, setPlannedAt] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [stop, setStop] = useState(false);
   const [resetHeld, setResetHeld] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [perPartRs, setPerPartRs] = useState(0);
   const [_plannedRs] = useState(0);
   const [badParts, setBadParts] = useState(0);
@@ -114,6 +121,7 @@ export default function DashboardClient() {
   const [micActive, setMicActive] = useState(false);
   const [thinking, setThinking] = useState(false);
   const thinkingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(() => isSpeakingNow());
   const [popup, setPopup] = useState<PopupData | null>(null);
   const popupRef = useRef<PopupData | null>(null);
   const popupMicOffArmed = useRef(false);
@@ -163,6 +171,7 @@ export default function DashboardClient() {
     },
   });
   const toggleMic = () => {
+    if (isSpeaking) return;
     if (micActive) {
       stopVoiceCapture();
       setMicActive(false);
@@ -174,7 +183,7 @@ export default function DashboardClient() {
     }
   };
 
-  const isListening = micActive || micListening;
+  const isListening = !isSpeaking && (micActive || micListening);
 
   useEffect(() => {
 
@@ -195,14 +204,12 @@ export default function DashboardClient() {
           const v = (p.value ?? p.payload ?? p) as Record<string, unknown> | boolean;
           if (v !== null && typeof v === "object") {
             if (typeof v.power === "boolean") setMachineOn(v.power);
+            if (typeof v.led === "boolean") setPowerOn(v.led);
+            else if (typeof v.power === "boolean") setPowerOn(v.power);
             if (typeof v.production === "boolean") setProductionOn(v.production);
             return;
           }
-          if (p.target === "production") {
-            setProductionOn(Boolean(p.value));
-            return;
-          }
-          setMachineOn(Boolean(p.value));
+          setMachineOn(Boolean(p.value ?? v));
         } catch { void 0; }
       },
     });
@@ -508,14 +515,14 @@ export default function DashboardClient() {
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", color: "var(--ink)", textTransform: "uppercase" }}>Machine</span>
               <Switch
                 checked={machineOn}
-                onCheckedChange={(v) => { setMachineOn(v); setProductionOn(false); sendNodeRedMessage(NODE_RED_WS_PATHS.machine, { device: "machine", value: { power: v } }); }}
+                onCheckedChange={(v) => { setMachineOn(v); sendNodeRedMessage(NODE_RED_WS_PATHS.machine, { device: "machine", value: { power: v } }); }}
                 aria-label="Machine"
                 className="data-[state=checked]:bg-[#22c55e]"
               />
             </div>
             <div className="flex items-center gap-5">
-              <Led label="ON/OFF" on={machineOn} variant="default" size="lg" />
-              <Led label="PRODUCTION" on={machineOn} variant={machineOn && (stop || !productionOn) ? "danger" : "default"} size="lg" />
+              <Led label="POWER" on={powerOn} variant="default" size="lg" />
+              <Led label="PRODUCTION" on={powerOn} variant={powerOn && (stop || !productionOn) ? "danger" : "cyan"} size="lg" />
             </div>
           </div>
           <div style={{ padding: "0 16px 12px", borderTop: "1px solid var(--hairline)", marginTop: 2 }}>
@@ -552,70 +559,6 @@ export default function DashboardClient() {
         </div>
 
         {}
-        <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "visible", padding: "14px 12px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 10, alignItems: "end" }}>
-            <div>
-              <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Item</Label>
-              <Select value={item ? String(slNo) : ""} onValueChange={(v) => { if (v !== "__empty") selectItem(Number(v)); }} onOpenChange={(o) => { if (o) requestItemList(); }} disabled={!machineOn}>
-                <SelectTrigger className="h-9 rounded-lg border px-3 text-sm font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }}><SelectValue placeholder="Select item" /></SelectTrigger>
-                <SelectContent style={{ background: "var(--panel)", borderColor: "var(--hairline)" }}>
-                  {itemList.length === 0 && <SelectItem value="__empty" disabled>No items</SelectItem>}
-                  {itemList.map((e) => <SelectItem key={e.slNo} value={String(e.slNo)}>{cleanItem(e.item)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Set Qty</Label>
-              <div className="h-9 rounded-lg border flex items-stretch overflow-hidden disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)" }}>
-                <button type="button" aria-label="Decrease quantity" disabled={!machineOn} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) - 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderRight: "1px solid var(--hairline)" }}><Minus size={14} /></button>
-                <Input type="number" value={setQty} onChange={(e) => setSetQty(Number(e.target.value) || 0)} disabled={!machineOn} className="h-full border-0 px-1 text-sm mono-readout font-semibold text-center disabled:opacity-50" style={{ background: "transparent", color: "var(--ink)", boxShadow: "none" }} />
-                <button type="button" aria-label="Increase quantity" disabled={!machineOn} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) + 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderLeft: "1px solid var(--hairline)" }}><Plus size={14} /></button>
-              </div>
-            </div>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <Label className="micro-label" style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 400, textTransform: "none", letterSpacing: "0", marginBottom: 4, display: "block" }}>Select Date and Time (IST)</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
-              <DateTimePicker value={dateTime} onChange={setDateTime} disabled={!machineOn} />
-              <Button onClick={handleSubmit} disabled={!machineOn} className="h-8 rounded-md px-5 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "#3b82f6", color: "white", borderRadius: 6 }}>Submit</Button>
-            </div>
-          </div>
-        </div>
-
-        {}
-        <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1.5px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div className="flex items-center gap-3">
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", letterSpacing: "0.02em" }}>Place Order</span>
-            <Switch checked={placeOrder} onCheckedChange={(v) => { setPlaceOrder(v); sendNodeRedMessage(NODE_RED_WS_PATHS.placeOrder, { device: "placeOrder", value: v }); }} disabled={!machineOn} className="data-[state=checked]:bg-[#3b82f6] disabled:opacity-50" aria-label="Place order" />
-          </div>
-          <div className="text-right" style={{ minWidth: 110 }}>
-            <p className="micro-label" style={{ fontSize: 10, letterSpacing: "0.08em", textAlign: "right" }}>Status</p>
-            <p className="font-extrabold" style={{ color: "#60a5fa", marginTop: 4, fontSize: 15, letterSpacing: "-0.01em" }}>{placeOrder ? "Order Placed" : "Not Placed"}</p>
-          </div>
-        </div>
-
-        {}
-        <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div className="flex items-center gap-3">
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", letterSpacing: "0.01em" }}>Stop</span>
-            <Switch checked={stop} onCheckedChange={(v) => { setStop(v); sendNodeRedMessage(NODE_RED_WS_PATHS.stop, { device: "stop", value: v }); }} disabled={!machineOn} className="data-[state=checked]:bg-[#ef4444] disabled:opacity-50" aria-label="Stop" />
-          </div>
-          <Button
-            disabled={!machineOn}
-            onPointerDown={(e) => { e.preventDefault(); if (machineOn && !resetHeld) sendResetHold(true); }}
-            onPointerUp={() => { if (resetHeld) sendResetHold(false); }}
-            onPointerLeave={() => { if (resetHeld) sendResetHold(false); }}
-            onPointerCancel={() => { if (resetHeld) sendResetHold(false); }}
-            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && machineOn && !resetHeld && !e.repeat) sendResetHold(true); }}
-            onKeyUp={() => { if (resetHeld) sendResetHold(false); }}
-            onContextMenu={(e) => e.preventDefault()}
-            aria-label="Reset (hold)"
-            className="h-10 px-8 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed select-none"
-            style={{ background: "#22c55e", color: "white", borderRadius: 10, minWidth: 92, border: "1px solid #16a34a", transform: resetHeld ? "translateY(2px) scale(0.98)" : "none", filter: resetHeld ? "brightness(0.9)" : "none", boxShadow: resetHeld ? "inset 0 2px 6px rgba(0,0,0,0.35)" : "0 3px 0 #15803d, 0 6px 14px rgba(0,0,0,0.35)", touchAction: "none", transition: "box-shadow 0.12s ease, transform 0.12s ease, filter 0.12s ease" }}
-          >Reset</Button>
-        </div>
-
-        {}
         <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden", padding: "12px 16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <div><p className="micro-label" style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 400, textTransform: "none", letterSpacing: "0" }}>Required QTY</p><p className="mono-readout" style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{qtyReq}</p></div>
@@ -627,7 +570,7 @@ export default function DashboardClient() {
               <span className="micro-label" style={{ fontSize: 10, color: "var(--ink-subtle)" }}>Progress</span>
               <span className="mono-readout" style={{ fontSize: 11, fontWeight: 700, color: produced >= qtyReq ? "#22c55e" : "var(--cyan)" }}>{qtyReq > 0 ? Math.round((produced / qtyReq) * 100) : 0}% · {produced}/{qtyReq}</span>
             </div>
-            <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,0.08)", border: "1px solid var(--hairline)", overflow: "hidden" }}>
+            <div style={{ height: 8, borderRadius: 999, background: "var(--module)", border: "1px solid var(--hairline)", overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${qtyReq > 0 ? Math.min(100, (produced / qtyReq) * 100) : 0}%`, background: produced >= qtyReq ? "linear-gradient(90deg, #22c55e 0%, #4ade80 100%)" : "linear-gradient(90deg, #06b6d4 0%, #22d3ee 100%)", borderRadius: 999, transition: "width 0.6s ease", boxShadow: produced >= qtyReq ? "0 0 8px rgba(34,197,94,0.45)" : "0 0 8px rgba(6,182,214,0.35)" }} />
             </div>
           </div>
@@ -657,6 +600,74 @@ export default function DashboardClient() {
           );
         })()}
 
+        {}
+        <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "visible", padding: "14px 12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 10, alignItems: "end" }}>
+            <div>
+              <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Item</Label>
+              <Select value={item ? String(slNo) : ""} onValueChange={(v) => { if (v !== "__empty") selectItem(Number(v)); }} onOpenChange={(o) => { if (o) requestItemList(); }} disabled={!machineOn || locked}>
+                <SelectTrigger className="h-9 rounded-lg border px-3 text-sm font-semibold disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)", color: "var(--ink)" }}><SelectValue placeholder="Select item" /></SelectTrigger>
+                <SelectContent style={{ background: "var(--panel)", borderColor: "var(--hairline)" }}>
+                  {itemList.length === 0 && <SelectItem value="__empty" disabled>No items</SelectItem>}
+                  {itemList.map((e) => <SelectItem key={e.slNo} value={String(e.slNo)}>{cleanItem(e.item)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="micro-label" style={{ fontSize: 10, color: "var(--ink-muted)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Set Qty</Label>
+              <div className="h-9 rounded-lg border flex items-stretch overflow-hidden disabled:opacity-50" style={{ background: "var(--module)", borderColor: "var(--hairline-strong)" }}>
+                <button type="button" aria-label="Decrease quantity" disabled={!machineOn || locked} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) - 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderRight: "1px solid var(--hairline)" }}><Minus size={14} /></button>
+                <Input type="number" value={setQty} onChange={(e) => setSetQty(Number(e.target.value) || 0)} disabled={!machineOn || locked} className="h-full border-0 px-1 text-sm mono-readout font-semibold text-center disabled:opacity-50" style={{ background: "transparent", color: "var(--ink)", boxShadow: "none" }} />
+                <button type="button" aria-label="Increase quantity" disabled={!machineOn || locked} onClick={() => setSetQty((q) => Math.max(0, (Number(q) || 0) + 1))} className="px-2 grid place-items-center transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-50" style={{ color: "var(--ink)", borderLeft: "1px solid var(--hairline)" }}><Plus size={14} /></button>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Label className="micro-label" style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 400, textTransform: "none", letterSpacing: "0", marginBottom: 4, display: "block" }}>Select Date and Time (IST)</Label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
+              <DateTimePicker value={dateTime} onChange={setDateTime} disabled={!machineOn || locked} />
+              <Button onClick={handleSubmit} disabled={!machineOn || locked} className="h-8 rounded-md px-5 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "#3b82f6", color: "white", borderRadius: 6 }}>Submit</Button>
+            </div>
+          </div>
+        </div>
+
+        {}
+        <div className="instrument" style={{ margin: "10px 0 0", borderRadius: 12, background: "var(--panel)", border: "1.5px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="flex items-center gap-3">
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", letterSpacing: "0.02em" }}>Place Order</span>
+            <Switch checked={placeOrder} onCheckedChange={(v) => { setPlaceOrder(v); sendNodeRedMessage(NODE_RED_WS_PATHS.placeOrder, { device: "placeOrder", value: v }); }} disabled={!machineOn || locked} className="data-[state=checked]:bg-[#3b82f6] disabled:opacity-50" aria-label="Place order" />
+          </div>
+          <div className="text-right" style={{ minWidth: 110 }}>
+            <p className="micro-label" style={{ fontSize: 10, letterSpacing: "0.08em", textAlign: "right" }}>Status</p>
+            <p className="font-extrabold" style={{ color: "#60a5fa", marginTop: 4, fontSize: 15, letterSpacing: "-0.01em" }}>{placeOrder ? "Order Placed" : "Not Placed"}</p>
+          </div>
+        </div>
+
+        {}
+        <div className="instrument" style={{ margin: "10px 0 8px", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div className="flex items-center gap-3">
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", letterSpacing: "0.01em" }}>Stop</span>
+            <Switch checked={stop} onCheckedChange={(v) => { setStop(v); sendNodeRedMessage(NODE_RED_WS_PATHS.stop, { device: "stop", value: v }); }} disabled={!machineOn || locked} className="data-[state=checked]:bg-[#ef4444] disabled:opacity-50" aria-label="Stop" />
+          </div>
+          <div className="flex items-center gap-3">
+            <span style={{ fontSize: 13, fontWeight: 700, color: locked ? "#f59e0b" : "var(--ink)", letterSpacing: "0.01em" }}>Lock</span>
+            <Switch checked={locked} onCheckedChange={setLocked} className="data-[state=checked]:bg-[#f59e0b]" aria-label="Lock all inputs" />
+          </div>
+          <Button
+            disabled={!machineOn || locked}
+            onPointerDown={(e) => { e.preventDefault(); if (machineOn && !resetHeld) sendResetHold(true); }}
+            onPointerUp={() => { if (resetHeld) sendResetHold(false); }}
+            onPointerLeave={() => { if (resetHeld) sendResetHold(false); }}
+            onPointerCancel={() => { if (resetHeld) sendResetHold(false); }}
+            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && machineOn && !resetHeld && !e.repeat) sendResetHold(true); }}
+            onKeyUp={() => { if (resetHeld) sendResetHold(false); }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Reset (hold)"
+            className="h-10 px-8 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed select-none"
+            style={{ background: "#22c55e", color: "white", borderRadius: 10, minWidth: 92, border: "1px solid #16a34a", transform: resetHeld ? "translateY(2px) scale(0.98)" : "none", filter: resetHeld ? "brightness(0.9)" : "none", boxShadow: resetHeld ? "inset 0 2px 6px rgba(0,0,0,0.35)" : "0 3px 0 #15803d, 0 6px 14px rgba(0,0,0,0.35)", touchAction: "none", transition: "box-shadow 0.12s ease, transform 0.12s ease, filter 0.12s ease" }}
+          >Reset</Button>
+        </div>
+
           </>
         )}
 
@@ -683,7 +694,7 @@ export default function DashboardClient() {
                 <div>
                   <p style={{ fontSize: 11, color: "var(--ink-muted)", marginBottom: 4 }}>Gripper Position</p>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <input type="range" min={0} max={100} value={gripperPercent} onChange={(e) => { const v = Number(e.target.value); setGripperPercent(v); setGripperAction("idle"); sendNodeRedMessage(NODE_RED_WS_PATHS.gripper, { device: "gripper", value: { percent: v } }); }} style={{ flex: 1, accentColor: "#22c55e" }} disabled={!robotOn} />
+                    <input type="range" min={0} max={100} value={gripperPercent} onChange={(e) => { const v = Number(e.target.value); setGripperPercent(v); setGripperAction("idle"); sendNodeRedMessage(NODE_RED_WS_PATHS.gripper, { device: "gripper", value: { percent: v } }); }} style={{ flex: 1, accentColor: "#22c55e" }} disabled={!robotOn || locked} />
                     <span className="mono-readout" style={{ fontSize: 13, fontWeight: 800, minWidth: 44, textAlign: "right", color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{gripperPercent}%</span>
                   </div>
                 </div>
@@ -697,7 +708,7 @@ export default function DashboardClient() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 <Button
                   onClick={() => { if (!robotOn) return; setGripperPercent(100); setGripperAction("open"); sendNodeRedMessage(NODE_RED_WS_PATHS.gripper, { device: "gripper", value: { action: "open", percent: 100 } }); setLogs((l) => [{ id: Date.now(), time: new Date().toLocaleTimeString("en-IN", { hour12: true }), level: "info", msg: "Gripper OPEN 100%", meta: "gripper" }, ...l].slice(0, 50)); }}
-                  disabled={!robotOn}
+                  disabled={!robotOn || locked}
                   className="h-10 rounded-lg text-xs font-bold"
                   style={{ background: gripperAction === "open" ? "#22c55e" : "var(--module)", color: gripperAction === "open" ? "white" : "var(--ink)", border: `1px solid ${gripperAction === "open" ? "#16a34a" : "var(--hairline)"}` }}
                 >
@@ -705,7 +716,7 @@ export default function DashboardClient() {
                 </Button>
                 <Button
                   onClick={() => { if (!robotOn) return; setGripperPercent(0); setGripperAction("close"); sendNodeRedMessage(NODE_RED_WS_PATHS.gripper, { device: "gripper", value: { action: "close", percent: 0 } }); setLogs((l) => [{ id: Date.now(), time: new Date().toLocaleTimeString("en-IN", { hour12: true }), level: "warn", msg: "Gripper CLOSE 0%", meta: "gripper" }, ...l].slice(0, 50)); }}
-                  disabled={!robotOn}
+                  disabled={!robotOn || locked}
                   className="h-10 rounded-lg text-xs font-bold"
                   style={{ background: gripperAction === "close" ? "#ef4444" : "var(--module)", color: gripperAction === "close" ? "white" : "var(--ink)", border: `1px solid ${gripperAction === "close" ? "#dc2626" : "var(--hairline)"}` }}
                 >
@@ -734,7 +745,7 @@ export default function DashboardClient() {
                       sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", preset: b.preset, joints: b.joints });
                       setLogs((l) => [{ id: Date.now(), time: new Date().toLocaleTimeString("en-IN", { hour12: true }), level: "info", msg: `Robot → ${b.label}`, meta: `joints ${b.preset}` }, ...l].slice(0, 50));
                     }}
-                    disabled={!robotOn}
+                    disabled={!robotOn || locked}
                     className="h-10 rounded-lg text-xs font-bold"
                     style={{ background: "var(--module)", color: "var(--ink)", border: "1px solid var(--hairline)", opacity: robotOn ? 1 : 0.5 }}
                   >
@@ -750,16 +761,16 @@ export default function DashboardClient() {
                 {joints.map((val, idx) => (
                   <div key={idx} style={{ display: "grid", gridTemplateColumns: "36px 1fr 48px", gap: 10, alignItems: "center" }}>
                     <span className="mono-readout" style={{ fontSize: 11, fontWeight: 700, color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>J{idx}</span>
-                    <input type="range" min={0} max={360} value={val} disabled={!robotOn} onChange={(e) => { const v = Number(e.target.value); const next = [...joints]; next[idx] = v; setJoints(next); }} onMouseUp={() => { if (!robotOn) return; sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints }); }} onTouchEnd={() => { if (!robotOn) return; sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints }); }} style={{ accentColor: robotOn ? "#22c55e" : "#3a3e45", opacity: robotOn ? 1 : 0.5 }} />
+                    <input type="range" min={0} max={360} value={val} disabled={!robotOn || locked} onChange={(e) => { const v = Number(e.target.value); const next = [...joints]; next[idx] = v; setJoints(next); }} onMouseUp={() => { if (!robotOn) return; sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints }); }} onTouchEnd={() => { if (!robotOn) return; sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints }); }} style={{ accentColor: robotOn ? "#22c55e" : "#3a3e45", opacity: robotOn ? 1 : 0.5 }} />
                     <span className="mono-readout" style={{ fontSize: 11, fontWeight: 700, textAlign: "right", color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{Math.round(val)}°</span>
                   </div>
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <Button disabled={!robotOn} onClick={() => sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints })} className="flex-1 h-9 rounded-lg text-xs font-bold" style={{ background: robotOn ? "#22c55e" : "var(--module)", color: robotOn ? "white" : "var(--ink-faint)", border: "1px solid var(--hairline)", opacity: robotOn ? 1 : 0.5 }}>
+                <Button disabled={!robotOn || locked} onClick={() => sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints })} className="flex-1 h-9 rounded-lg text-xs font-bold" style={{ background: robotOn ? "#22c55e" : "var(--module)", color: robotOn ? "white" : "var(--ink-faint)", border: "1px solid var(--hairline)", opacity: robotOn ? 1 : 0.5 }}>
                   Send Joints
                 </Button>
-                <Button disabled={!robotOn} onClick={() => { const r = [...joints]; r.fill(0); setJoints(r); sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints: r }); }} variant="outline" className="h-9 rounded-lg text-xs font-bold" style={{ background: "transparent", borderColor: "var(--hairline)" }}>
+                <Button disabled={!robotOn || locked} onClick={() => { const r = [...joints]; r.fill(0); setJoints(r); sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joints: r }); }} variant="outline" className="h-9 rounded-lg text-xs font-bold" style={{ background: "transparent", borderColor: "var(--hairline)" }}>
                   Reset
                 </Button>
               </div>
@@ -811,24 +822,30 @@ export default function DashboardClient() {
             </div>
           </>
         )}
-        <div style={{ height: 132 }} />
+        <div style={{ height: 152 }} />
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 390, padding: "0 12px 10px", boxSizing: "border-box", zIndex: 40, pointerEvents: "none" }}>
-          <div className="instrument" style={{ background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: "0 -2px 20px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.35)", borderRadius: 12, overflow: "hidden", padding: "12px 14px", pointerEvents: "auto" }}>
+          <div className="instrument" style={{ background: "var(--panel)", border: "1px solid var(--hairline)", boxShadow: isSpeaking ? "0 -2px 20px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.35), 0 0 24px rgba(245,158,11,0.18)" : isListening || thinking ? "0 -2px 20px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.35), 0 0 24px rgba(6,182,214,0.12)" : "0 -2px 20px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.35)", borderRadius: 12, overflow: "hidden", padding: "0 0 12px", pointerEvents: "auto", backdropFilter: "blur(14px)", transition: "box-shadow 0.3s ease" }}>
+            {(isSpeaking || isListening || thinking) && <div style={{ height: 2, background: isSpeaking ? "linear-gradient(90deg, transparent, rgba(245,158,11,0.9), transparent)" : "linear-gradient(90deg, transparent, rgba(6,182,214,0.85), transparent)", boxShadow: isSpeaking ? "0 0 12px rgba(245,158,11,0.6)" : "0 0 12px rgba(6,182,214,0.55)" }} />}
+            <div style={{ padding: "12px 14px 0" }}>
             <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
               <span className="micro-label">Operator Command · Voice</span>
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: thinking ? "var(--cyan)" : isListening ? "var(--green)" : "var(--ink-subtle)" }}>
-                <span className={`dot ${thinking ? "dot--cyan" : isListening ? "dot--green" : "dot--muted"}`} style={{ width: 6, height: 6 }} />
-                {thinking ? "Thinking" : isListening ? "Listening" : "Idle"}
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: isSpeaking ? "#f59e0b" : thinking ? "var(--cyan)" : isListening ? "var(--green)" : "var(--ink-subtle)" }}>
+                <span className={`dot ${isSpeaking ? "dot--amber" : thinking ? "dot--cyan" : isListening ? "dot--green" : "dot--muted"}`} style={{ width: 6, height: 6 }} />
+                {isSpeaking ? "Speaking" : thinking ? "Thinking" : isListening ? "Listening" : "Idle"}
               </span>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <MicButton active={isListening} onToggle={toggleMic} />
+              <MicButton active={isListening} thinking={thinking} speaking={isSpeaking} disabled={isSpeaking} onToggle={toggleMic} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <MicFrequency active={isListening} thinking={thinking} />
               </div>
             </div>
-            {micText ? (
-              <div className="mono-readout" style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)", fontSize: 11, color: "var(--ink)", minHeight: 28, maxHeight: 56, overflowY: "auto" }}>
+            {isSpeaking ? (
+              <p className="micro-label" style={{ marginTop: 6, color: "#f59e0b", fontSize: 9, textAlign: "center", fontWeight: 700 }}>
+                🔊 Speaking — mic paused
+              </p>
+            ) : micText ? (
+              <div className="mono-readout" style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)", boxShadow: isListening || thinking ? "0 0 12px rgba(59,130,246,0.15)" : "none", transition: "box-shadow 0.3s ease", fontSize: 11, color: "var(--ink)", minHeight: 28, maxHeight: 56, overflowY: "auto" }}>
                 {micText}
               </div>
             ) : isListening ? (
@@ -840,6 +857,7 @@ export default function DashboardClient() {
                 Tap mic to give a voice command
               </p>
             )}
+            </div>
           </div>
         </div>
       </div>

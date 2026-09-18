@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { startMicrophoneStt, type SttSession } from "@/lib/deepgram";
+import { isSpeakingNow, startMicrophoneStt, subscribeSpeaking, type SttSession } from "@/lib/deepgram";
 
 declare global {
   interface Window {
@@ -35,11 +35,26 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
   const interimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepgramFailsRef = useRef(0);
+  const speakingRef = useRef(isSpeakingNow());
   const [resolvedKey, setResolvedKey] = useState("");
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
+
+  useEffect(() => {
+    speakingRef.current = isSpeakingNow();
+    return subscribeSpeaking((v) => {
+      speakingRef.current = v;
+      if (v) {
+        console.log("[STT] paused — speaker active");
+        setInterim("");
+        if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+      } else {
+        console.log("[STT] resumed — speaker idle");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +85,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
       (rec as unknown as { maxAlternatives: number }).maxAlternatives = 1;
       rec.lang = "en-IN";
       rec.onresult = (e) => {
-        if (!activeRef.current) return;
+        if (!activeRef.current || speakingRef.current) return;
         let interimTxt = "";
         let finalTxt = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -181,7 +196,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
           setListening(true);
         },
         onTranscript: ({ transcript, isFinal, speechFinal }) => {
-          if (!active || !transcript) return;
+          if (!active || !transcript || speakingRef.current) return;
           const cleaned = transcript.trim();
           if (!cleaned) return;
           deepgramFailsRef.current = 0;

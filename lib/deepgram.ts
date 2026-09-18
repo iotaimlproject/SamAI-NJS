@@ -376,6 +376,7 @@ function stopCurrentAudio() {
   } catch {
     void 0;
   }
+  setSpeaking(false);
 }
 
 export async function playAudioBlob(blob: Blob): Promise<HTMLAudioElement> {
@@ -394,15 +395,19 @@ export async function playAudioBlob(blob: Blob): Promise<HTMLAudioElement> {
   audio.onended = () => {
     console.log("[TTS] playback ended");
     cleanup();
+    setSpeaking(false);
   };
   audio.onerror = () => {
     console.error("[TTS] audio element error, url revoked");
     cleanup();
+    setSpeaking(false);
   };
   try {
     await audio.play();
+    setSpeaking(true);
   } catch (err) {
     cleanup();
+    setSpeaking(false);
     if ((err as Error)?.name === "AbortError") {
       console.log("[TTS] play() superseded by newer speech, stopped");
     } else {
@@ -433,6 +438,33 @@ async function speakTextWithRetry(args: {
 }
 
 let ttsAbort: AbortController | null = null;
+
+let _isSpeaking = false;
+const speakingSubscribers = new Set<(v: boolean) => void>();
+function setSpeaking(v: boolean) {
+  if (_isSpeaking === v) return;
+  _isSpeaking = v;
+  if (isDev) console.log(`[TTS] speaking=${v}`);
+  speakingSubscribers.forEach((fn) => {
+    try {
+      fn(v);
+    } catch {
+      void 0;
+    }
+  });
+}
+export function subscribeSpeaking(fn: (v: boolean) => void): () => void {
+  speakingSubscribers.add(fn);
+  try {
+    fn(_isSpeaking);
+  } catch {
+    void 0;
+  }
+  return () => speakingSubscribers.delete(fn);
+}
+export function isSpeakingNow(): boolean {
+  return _isSpeaking;
+}
 
 export function warmSpeechVoices() {
   try {
@@ -537,9 +569,18 @@ function browserSpeakFallback(text: string, reason: string): SpeechSynthesisUtte
   u.volume = 1;
   const voices = window.speechSynthesis.getVoices();
   if (voices.length === 0) console.error("[TTS] no speechSynthesis voices loaded, fallback may be silent, reason:", reason);
-  u.onstart = () => console.log("[TTS] browser fallback started (" + reason + "):", text.slice(0, 40));
-  u.onend = () => console.log("[TTS] browser fallback ended");
-  u.onerror = (e) => console.error("[TTS] browser fallback error:", e.error || e.type);
+  u.onstart = () => {
+    console.log("[TTS] browser fallback started (" + reason + "):", text.slice(0, 40));
+    setSpeaking(true);
+  };
+  u.onend = () => {
+    console.log("[TTS] browser fallback ended");
+    setSpeaking(false);
+  };
+  u.onerror = (e) => {
+    console.error("[TTS] browser fallback error:", e.error || e.type);
+    setSpeaking(false);
+  };
   window.speechSynthesis.speak(u);
   return u;
 }

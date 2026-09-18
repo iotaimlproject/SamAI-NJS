@@ -566,6 +566,25 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+/* Theme-aware scrollbars — thin, quiet, both themes */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+}
 /* Select dropdown — ensure themed */
 select {
   background-color: var(--panel);
@@ -577,12 +596,60 @@ select option {
   color: var(--ink);
 }
 
+/* Fluid tap — instant response, no grey flash */
+html {
+  touch-action: manipulation;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled) {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-ink {
+  position: absolute;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%) scale(0);
+  background: currentColor;
+  opacity: 0.22;
+  pointer-events: none;
+  animation: ripple-spread 0.55s ease-out forwards;
+}
+@keyframes ripple-spread {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 0.22; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ripple-ink {
+    animation: none;
+    display: none;
+  }
+  .ripple-screen-ink {
+    display: none;
+  }
+}
 /* Micro-motion — press feedback everywhere (transform/opacity only) */
 button:not(:disabled) {
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, filter 0.12s ease;
 }
 button:not(:disabled):active {
   transform: scale(0.95);
+  filter: brightness(1.12);
+}
+.ripple-screen-ink {
+  position: fixed;
+  z-index: 200;
+  border-radius: 9999px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  border: 1.5px solid rgba(6, 182, 214, 0.55);
+  background: radial-gradient(circle, rgba(6, 182, 214, 0.16) 0%, transparent 70%);
+  animation: ripple-screen-spread 0.45s ease-out forwards;
+}
+@keyframes ripple-screen-spread {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 .led {
   transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
@@ -622,6 +689,19 @@ button:not(:disabled):active {
   50% { content: ".."; }
   75% { content: "..."; }
 }
+.orb-ring {
+  animation: orb-spin 3.2s linear infinite;
+}
+.orb-ring--fast {
+  animation-duration: 1.4s;
+}
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled):active {
     transform: none;
@@ -634,5 +714,9 @@ button:not(:disabled):active {
   .thinking-ellipsis::after {
     animation: none;
     content: "...";
+  }
+  .orb-ring,
+  .orb-ring--fast {
+    animation: none;
   }
 }
