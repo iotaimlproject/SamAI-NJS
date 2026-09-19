@@ -840,23 +840,30 @@ export default function DashboardClient() {
                 <MicFrequency active={isListening} thinking={thinking} />
               </div>
             </div>
-            {isSpeaking ? (
-              <p className="micro-label" style={{ marginTop: 6, color: "#f59e0b", fontSize: 9, textAlign: "center", fontWeight: 700 }}>
-                🔊 Speaking — mic paused
-              </p>
-            ) : micText ? (
-              <div className="mono-readout" style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)", boxShadow: isListening || thinking ? "0 0 12px rgba(59,130,246,0.15)" : "none", transition: "box-shadow 0.3s ease", fontSize: 11, color: "var(--ink)", minHeight: 28, maxHeight: 56, overflowY: "auto" }}>
+            {micText ? (
+              <div key={micText} className="mono-readout mic-text-box" style={{ marginTop: 8, padding: "8px 12px", borderRadius: 10, background: "rgba(59,130,246,0.09)", border: "1px solid rgba(59,130,246,0.2)", boxShadow: isListening || thinking ? "0 0 14px rgba(59,130,246,0.18)" : "0 0 0 transparent", fontSize: 12, lineHeight: 1.5, color: "var(--ink)", minHeight: 34, maxHeight: 72, overflowY: "auto", overflowX: "hidden", whiteSpace: "pre-wrap", boxSizing: "border-box", width: "100%" }}>
                 {micText}
               </div>
-            ) : isListening ? (
-              <p className="micro-label" style={{ marginTop: 6, color: "var(--green)", fontSize: 9, textAlign: "center", fontWeight: 600 }}>
-                Listening… tap mic to stop
-              </p>
-            ) : (
-              <p className="micro-label" style={{ marginTop: 6, color: "var(--ink-subtle)", fontSize: 9, textAlign: "center" }}>
-                Tap mic to give a voice command
-              </p>
-            )}
+            ) : null}
+            <div style={{ marginTop: 8, minHeight: 14, display: "grid", placeItems: "center" }}>
+              {isSpeaking ? (
+                <p className="micro-label mic-hint" style={{ color: "#f59e0b", fontSize: 9, textAlign: "center", fontWeight: 700 }}>
+                  🔊 Speaking — mic paused
+                </p>
+              ) : thinking ? (
+                <p className="micro-label mic-hint" style={{ color: "var(--cyan)", fontSize: 9, textAlign: "center", fontWeight: 600 }}>
+                  Thinking… AI processing
+                </p>
+              ) : isListening ? (
+                <p className="micro-label mic-hint" style={{ color: "var(--green)", fontSize: 9, textAlign: "center", fontWeight: 600 }}>
+                  Listening… tap mic to stop
+                </p>
+              ) : (
+                <p className="micro-label mic-hint" style={{ color: "var(--ink-subtle)", fontSize: 9, textAlign: "center" }}>
+                  Tap mic to give a voice command
+                </p>
+              )}
+            </div>
             </div>
           </div>
         </div>

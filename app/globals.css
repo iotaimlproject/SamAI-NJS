@@ -702,6 +702,22 @@ button:not(:disabled):active {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
 }
+.mic-text-box {
+  animation: micTextIn 0.28s cubic-bezier(0.2, 0.9, 0.25, 1.05);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+@keyframes micTextIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mic-hint {
+  animation: micHintIn 0.2s ease;
+}
+@keyframes micHintIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled):active {
     transform: none;
