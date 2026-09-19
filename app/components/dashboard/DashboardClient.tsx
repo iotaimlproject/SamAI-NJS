@@ -521,8 +521,8 @@ export default function DashboardClient() {
               />
             </div>
             <div className="flex items-center gap-5">
-              <Led label="POWER" on={powerOn} variant="default" size="lg" />
-              <Led label="PRODUCTION" on={powerOn} variant={powerOn && (stop || !productionOn) ? "danger" : "cyan"} size="lg" />
+              <Led label="POWER" on={machineOn} variant={powerOn ? "default" : "danger"} size="lg" />
+              <Led label="PRODUCTION" on={machineOn} variant={machineOn && (stop || !productionOn) ? "danger" : "default"} size="lg" />
             </div>
           </div>
           <div style={{ padding: "0 16px 12px", borderTop: "1px solid var(--hairline)", marginTop: 2 }}>
