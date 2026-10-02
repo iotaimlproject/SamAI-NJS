@@ -1,0 +1,251 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMoon, faSun } from "@fortawesome/free-solid-svg-icons";
+import { handleSpeakResponse } from "@/lib/voiceService";
+import { isSpeakingNow, subscribeSpeaking, warmSpeechVoices } from "@/lib/deepgram";
+import { installTapRipple } from "@/lib/ripple";
+import { useVoiceCapture } from "@/hooks/useVoiceCapture";
+import { NODE_RED_WS_PATHS, closeNodeRedSocket, getNodeRedSocket, sendNodeRedMessage } from "@/lib/nodeRedWebSocket";
+import { RobotHeader } from "./RobotHeader";
+import { StatusPanel } from "./StatusPanel";
+import { JointDisplay } from "./JointDisplay";
+import { PositionControls } from "./PositionControls";
+import { ProgramPanel } from "./ProgramPanel";
+import { VoiceBar, VoiceDock } from "./VoiceBar";
+import { HOME_JOINTS, RETREAT_JOINTS, pushLog, type Pose, type PositionPreset, type ProgramId, type RobotLog, type Velocity } from "./types";
+
+export default function RobotClient() {
+  const [mounted, setMounted] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    installTapRipple();
+    return subscribeSpeaking(setIsSpeaking);
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem("samai-theme") as "dark" | "light" | null;
+    const initial = saved || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    setTheme(initial);
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(initial);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(theme);
+    localStorage.setItem("samai-theme", theme);
+  }, [theme, mounted]);
+
+  const [robotOn, setRobotOn] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [velocity, setVelocity] = useState<Velocity>("slow");
+  const [joints, setJoints] = useState<number[]>([...HOME_JOINTS]);
+  const [pose, setPose] = useState<Pose | null>(null);
+  const [activeJoint, setActiveJoint] = useState<number | null>(null);
+  const [program, setProgram] = useState<ProgramId | null>(null);
+  const [logs, setLogs] = useState<RobotLog[]>(() => pushLog([], "Robot ready", "info", "robot"));
+  const [micActive, setMicActive] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const thinkingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(() => isSpeakingNow());
+
+  const log = (msg: string, level: "info" | "warn" | "error" = "info", meta = "robot") =>
+    setLogs((l) => pushLog(l, msg, level, meta));
+
+  const { listening: micListening, text: micText, setText: setMicInput, stop: stopVoiceCapture } = useVoiceCapture({
+    enabled: micActive,
+    onResult: async (transcript, isFinal) => {
+      if (!isFinal) return;
+      setThinking(true);
+      if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
+      thinkingTimer.current = setTimeout(() => setThinking(false), 25000);
+      sendNodeRedMessage(NODE_RED_WS_PATHS.speak, { device: "speak", value: transcript, text: transcript, source: "dashboard" });
+    },
+    onFatalError: (msg) => {
+      setMicActive(false);
+      setThinking(false);
+      if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
+      log(msg, "warn", "voice");
+    },
+  });
+
+  const toggleMic = () => {
+    if (isSpeaking) return;
+    if (micActive) {
+      stopVoiceCapture();
+      setMicActive(false);
+      setThinking(false);
+      if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
+      log("Mic off", "info", "voice");
+    } else {
+      warmSpeechVoices();
+      setMicActive(true);
+      log("Mic on — listening…", "info", "voice");
+    }
+  };
+
+  const isListening = !isSpeaking && (micActive || micListening);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.robot, {
+      onopen: () => { setConnected(true); console.log("[Robot] /ws/robot connected (duplex)"); },
+      onclose: () => setConnected(false),
+      onmessage: (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          if (p.device === "robot" && typeof p.value === "boolean") setRobotOn(Boolean(p.value));
+          const v = p.value as Record<string, unknown> | boolean;
+          if (v && typeof v === "object") {
+            const o = v as Record<string, unknown>;
+            if (typeof o.on === "boolean") setRobotOn(Boolean(o.on));
+            if (o.velocity === "fast" || o.velocity === "slow") setVelocity(o.velocity);
+          }
+          if (p.on !== undefined) setRobotOn(Boolean(p.on));
+        } catch {}
+      },
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.robot);
+  }, []);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.joints, {
+      onopen: () => console.log("[Robot] /ws/joints connected (duplex)"),
+      onmessage: (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          const v = (p.value ?? p.payload ?? p) as Record<string, unknown>;
+          const arr = (v.joints ?? v.angles) as unknown;
+          if (Array.isArray(arr) && arr.length >= 6 && arr.every((n) => typeof n === "number")) {
+            setJoints((arr as number[]).slice(0, 6));
+          }
+          const rawPose = (v.pose ?? v.position ?? (p as Record<string, unknown>).pose) as Record<string, unknown> | null;
+          if (rawPose && typeof rawPose === "object") {
+            const num = (k: string) => (typeof rawPose[k] === "number" ? (rawPose[k] as number) : null);
+            setPose({ x: num("x"), y: num("y"), z: num("z"), roll: num("roll"), pitch: num("pitch"), yaw: num("yaw") });
+          }
+        } catch {}
+      },
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.joints);
+  }, []);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.speak, {
+      onopen: () => console.log("[Robot] /ws/speak connected"),
+      onmessage: (e) => console.log("[Robot /ws/speak] echo:", e.data),
+      onerror: (e) => { const hasDetail = e && typeof e === "object" && Object.keys(e as object).length > 0; if (hasDetail) console.debug("[Robot /ws/speak] note:", e); },
+      onclose: () => console.log("[Robot /ws/speak] closed"),
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.speak);
+  }, []);
+
+  useEffect(() => {
+    getNodeRedSocket(NODE_RED_WS_PATHS.voice, {
+      onopen: () => console.log("[Robot] /ws/voice connected"),
+      onmessage: async (e) => {
+        let payload: unknown; try { payload = JSON.parse(e.data); } catch { payload = e.data; }
+        const p = payload as Record<string, unknown>;
+        const text = (p?.value ?? p?.text ?? p?.payload ?? (typeof payload === "string" ? payload : "")) as string;
+        if (text && typeof text === "string") setMicInput(text);
+        setThinking(false);
+        if (thinkingTimer.current) clearTimeout(thinkingTimer.current);
+        await handleSpeakResponse(payload);
+      },
+      onerror: (e) => { const hasDetail = e && typeof e === "object" && Object.keys(e as object).length > 0; if (hasDetail) console.debug("[Robot /ws/voice] note:", e); },
+      onclose: () => console.log("[Robot /ws/voice] closed"),
+    });
+    return () => closeNodeRedSocket(NODE_RED_WS_PATHS.voice);
+  }, [setMicInput]);
+
+  const toggleRobot = (v: boolean) => {
+    setRobotOn(v);
+    sendNodeRedMessage(NODE_RED_WS_PATHS.robot, { device: "robot", value: v });
+    log(v ? "Robot ON" : "Robot OFF", v ? "info" : "warn");
+  };
+
+  const selectVelocity = (v: Velocity) => {
+    if (!robotOn || v === velocity) return;
+    setVelocity(v);
+    sendNodeRedMessage(NODE_RED_WS_PATHS.robot, { device: "robot", value: { velocity: v } });
+    log(`Velocity → ${v}`, "info", "velocity");
+  };
+
+  const moveJoint = (joint: number, angle: number) => {
+    if (!robotOn) return;
+    const next = [...joints];
+    next[joint] = angle;
+    setJoints(next);
+    setActiveJoint(joint);
+    sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", joint, angle });
+    log(`J${joint + 1} → ${angle}°`, "info", "joints");
+  };
+
+  const goPreset = (preset: PositionPreset) => {
+    if (!robotOn) return;
+    setActiveJoint(null);
+    if (preset === "home") {
+      setJoints([...HOME_JOINTS]);
+      sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", preset: "home", joints: HOME_JOINTS });
+      log("Robot → Home", "info", "joints home");
+      return;
+    }
+    if (preset === "retreat") {
+      setJoints([...RETREAT_JOINTS]);
+      sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", preset: "retreat", joints: RETREAT_JOINTS });
+      log("Reset fault", "info", "joints retreat");
+      return;
+    }
+    sendNodeRedMessage(NODE_RED_WS_PATHS.joints, { device: "joints", preset });
+    log(`Robot → Position ${preset.toUpperCase()}`, "info", `joints ${preset}`);
+  };
+
+  const runProgram = () => {
+    if (!robotOn || !program) return;
+    sendNodeRedMessage(NODE_RED_WS_PATHS.robot, { device: "robot", command: "run_program", program });
+    log(`Programme ${program} → execute`, "info", "program");
+  };
+
+  if (!mounted) return <div className="page" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--canvas)" }}><div className="mobile-shell" style={{ width: "100%", maxWidth: 390, margin: "0 auto", minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--canvas)", borderLeft: "1px solid var(--hairline)", borderRight: "1px solid var(--hairline)", boxSizing: "border-box" }}><p className="eyebrow" style={{ textAlign: "center" }}>Initializing…</p></div></div>;
+
+  return (
+    <div className="page" style={{ background: "var(--canvas)", minHeight: "100vh", overflowX: "hidden" }}>
+      <div className="mobile-shell" style={{ width: "100%", maxWidth: 390, margin: "0 auto", background: "var(--canvas)", minHeight: "100vh", display: "flex", flexDirection: "column", borderLeft: "1px solid var(--hairline)", borderRight: "1px solid var(--hairline)", boxSizing: "border-box", overflow: "visible", padding: "0 12px" }}>
+        <div style={{ margin: "0 -12px", padding: "14px 28px 10px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, background: "var(--canvas)" }}>
+          <div>
+            <p className="micro-label" style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-subtle)", margin: 0, lineHeight: 1 }}>Robotics</p>
+            <h1 className="text-[18px] font-bold tracking-tight" style={{ letterSpacing: "-0.02em", color: "var(--ink)", marginTop: 2, lineHeight: 1.1 }}>SamAI Robot</h1>
+          </div>
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="grid place-items-center rounded-full border shrink-0"
+            style={{ background: "var(--panel)", borderColor: "var(--hairline)", color: "var(--ink)", width: 36, height: 36 }}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <FontAwesomeIcon icon={faSun} style={{ fontSize: 15 }} /> : <FontAwesomeIcon icon={faMoon} style={{ fontSize: 15 }} />}
+          </button>
+        </div>
+
+        <RobotHeader robotOn={robotOn} onToggle={toggleRobot} />
+        <StatusPanel
+          message={logs[0]?.msg ?? "Robot ready"}
+          status={robotOn ? "READY" : "STANDBY"}
+          connection={connected ? "CONNECTED" : "DISCONNECTED"}
+          command={isListening || thinking || isSpeaking ? "BUSY" : "IDLE"}
+          activeJoint={activeJoint === null ? "NONE" : `J${activeJoint + 1}`}
+          armState={robotOn ? "READY" : "STANDBY"}
+        />
+        <JointDisplay joints={joints} pose={pose} robotOn={robotOn} />
+        <PositionControls robotOn={robotOn} velocity={velocity} onVelocity={selectVelocity} onMove={moveJoint} onPreset={goPreset} />
+        <ProgramPanel robotOn={robotOn} selected={program} onSelect={setProgram} onExecute={runProgram} />
+
+        <VoiceBar />
+        <VoiceDock isListening={isListening} thinking={thinking} isSpeaking={isSpeaking} micText={micText} onToggle={toggleMic} />
+      </div>
+    </div>
+  );
+}

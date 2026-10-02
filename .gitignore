@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+tsconfig.tsbuildinfo
+.env.local
+.env
+*.log
+.DS_Store
+node-red/flows_cred.json
