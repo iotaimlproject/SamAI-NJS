@@ -122,7 +122,7 @@ export function MicWaves({ active, tone = "cyan" }: { active: boolean; tone?: ke
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "100%", height: 84, pointerEvents: "none" }}
+      style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "100%", height: 80, pointerEvents: "none" }}
     />
   );
 }

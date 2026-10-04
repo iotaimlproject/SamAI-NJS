@@ -16,6 +16,11 @@
         "env": []
     },
     {
+        "id": "820149a70f749c7f",
+        "type": "tab",
+        "label": "NextJS"
+    },
+    {
         "id": "25e97c8b8031181e",
         "type": "ui_base",
         "theme": {
@@ -482,6 +487,55 @@
         "usercert": false,
         "usercertificate": "",
         "userprivatekey": ""
+    },
+    {
+        "id": "cfg-wsrobot",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/robot",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wsvelocity",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/velocity",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wsstatus",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/status",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wsjoints",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/joints",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wspreset",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/preset",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wsspeak",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/speak",
+        "wholemsg": "false"
+    },
+    {
+        "id": "cfg-wsvoice",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/voice",
+        "wholemsg": "false"
     },
     {
         "id": "82ecd1c2f6d7d95b",
@@ -4785,6 +4839,1366 @@
         "wires": [
             [
                 "839b15343079ced8"
+            ]
+        ]
+    },
+    {
+        "id": "a101010101010101",
+        "type": "websocket in",
+        "z": "820149a70f749c7f",
+        "name": "/ws/robot WS IN",
+        "server": "cfg-wsrobot",
+        "client": "",
+        "x": 140,
+        "y": 160,
+        "wires": [
+            [
+                "0a099e23f4c1afb5"
+            ]
+        ]
+    },
+    {
+        "id": "a101010101010102",
+        "type": "websocket out",
+        "z": "820149a70f749c7f",
+        "name": "/ws/robot WS OUT",
+        "server": "cfg-wsrobot",
+        "client": "",
+        "x": 1490,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "a101010101010103",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Robot Func",
+        "func": "msg.payload = JSON.stringify({\n  robotstatus: msg.robotstatus,\n  robotled: msg.robotled\n});\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1270,
+        "y": 160,
+        "wires": [
+            [
+                "a101010101010102",
+                "a444177e69678651"
+            ]
+        ]
+    },
+    {
+        "id": "a101010101010104",
+        "type": "inject",
+        "z": "820149a70f749c7f",
+        "name": "Robot True",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 860,
+        "y": 100,
+        "wires": [
+            [
+                "147a09f1759b053c"
+            ]
+        ]
+    },
+    {
+        "id": "a202020202020201",
+        "type": "websocket in",
+        "z": "820149a70f749c7f",
+        "name": "/ws/velocity IN",
+        "server": "cfg-wsvelocity",
+        "client": "",
+        "x": 150,
+        "y": 460,
+        "wires": [
+            [
+                "a202020202020202"
+            ]
+        ]
+    },
+    {
+        "id": "a202020202020202",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Vel Func",
+        "func": "return {\n    velocity: JSON.parse(msg.payload).velocity\n};",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 460,
+        "wires": [
+            [
+                "bda4e1d50bf7483a"
+            ]
+        ]
+    },
+    {
+        "id": "a202020202020204",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "velocity dbg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 630,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "a303030303030301",
+        "type": "websocket out",
+        "z": "820149a70f749c7f",
+        "name": "/ws/status WS OUT",
+        "server": "cfg-wsstatus",
+        "client": "",
+        "x": 1450,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "a303030303030302",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Status Func",
+        "func": "msg.payload = JSON.stringify({ \n    message: msg.message, \n    status: msg.status, \n    connection: msg.connection, \n    command: msg.command, \n    activeJoint: msg.activeJoint, \n    armState: msg.armState \n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1210,
+        "y": 480,
+        "wires": [
+            [
+                "a303030303030304",
+                "a303030303030301"
+            ]
+        ]
+    },
+    {
+        "id": "a303030303030304",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "status Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1430,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "a404040404040401",
+        "type": "websocket in",
+        "z": "820149a70f749c7f",
+        "name": "/ws/joints WS IN",
+        "server": "cfg-wsjoints",
+        "client": "",
+        "x": 180,
+        "y": 740,
+        "wires": [
+            [
+                "a404040404040403",
+                "2324c34b3829f5d0"
+            ]
+        ]
+    },
+    {
+        "id": "a404040404040402",
+        "type": "websocket out",
+        "z": "820149a70f749c7f",
+        "name": "/ws/joints WS OUT",
+        "server": "cfg-wsjoints",
+        "client": "",
+        "x": 1430,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "a404040404040403",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Joints Func",
+        "func": "var d =JSON.parse(msg.payload);\nmsg.payload = { \n    joint1: d.joint1, \n    joint2: d.joint2, \n    joint3: d.joint3, \n    joint4: d.joint4, \n    joint5: d.joint5, \n    joint6: d.joint6 \n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 740,
+        "wires": [
+            [
+                "03ea5c84ed609d56",
+                "765cbd54e9465b02",
+                "5b903e1c1723ee89",
+                "c88cd36b1e518bc4",
+                "8fa4faf7027a9272",
+                "a52481bce96b1e1a"
+            ]
+        ]
+    },
+    {
+        "id": "a404040404040405",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Joints Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1410,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "a505050505050501",
+        "type": "websocket in",
+        "z": "820149a70f749c7f",
+        "name": "/ws/preset WS IN",
+        "server": "cfg-wspreset",
+        "client": "",
+        "x": 200,
+        "y": 1060,
+        "wires": [
+            [
+                "a505050505050502"
+            ]
+        ]
+    },
+    {
+        "id": "a505050505050502",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Preset / Prog Func",
+        "func": "var data = JSON.parse(msg.payload);\nmsg.payload = { \n    preset: data.preset, \n    program: data.program \n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 1060,
+        "wires": [
+            [
+                "35d511235cba46ee",
+                "a32be1a9d780b04d"
+            ]
+        ]
+    },
+    {
+        "id": "a505050505050504",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Preset Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 820,
+        "y": 1020,
+        "wires": []
+    },
+    {
+        "id": "a606060606060601",
+        "type": "websocket out",
+        "z": "820149a70f749c7f",
+        "name": "/ws/speak out",
+        "server": "cfg-wsspeak",
+        "client": "",
+        "x": 1400,
+        "y": 1260,
+        "wires": []
+    },
+    {
+        "id": "a606060606060602",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Speak Func",
+        "func": "msg.payload = JSON.stringify({ \n    text: msg.payload \n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1190,
+        "y": 1240,
+        "wires": [
+            [
+                "a606060606060604",
+                "a606060606060601"
+            ]
+        ]
+    },
+    {
+        "id": "a606060606060604",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Speak Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1400,
+        "y": 1200,
+        "wires": []
+    },
+    {
+        "id": "a707070707070701",
+        "type": "websocket in",
+        "z": "820149a70f749c7f",
+        "name": "/ws/voice WS IN",
+        "server": "cfg-wsvoice",
+        "client": "",
+        "x": 200,
+        "y": 1240,
+        "wires": [
+            [
+                "a707070707070702"
+            ]
+        ]
+    },
+    {
+        "id": "a707070707070702",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Voice Func",
+        "func": "return {\n    payload: JSON.parse(msg.payload).text\n};",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 1240,
+        "wires": [
+            [
+                "a707070707070704"
+            ]
+        ]
+    },
+    {
+        "id": "a707070707070704",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "voice dbg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 1240,
+        "wires": []
+    },
+    {
+        "id": "68117eda14b36a3f",
+        "type": "inject",
+        "z": "820149a70f749c7f",
+        "name": "Robot False",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "false",
+        "payloadType": "bool",
+        "x": 850,
+        "y": 240,
+        "wires": [
+            [
+                "5186ddd7ee923da6"
+            ]
+        ]
+    },
+    {
+        "id": "147a09f1759b053c",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "robotstatus",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 120,
+        "wires": [
+            [
+                "a101010101010103"
+            ]
+        ]
+    },
+    {
+        "id": "5186ddd7ee923da6",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "robotled",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1070,
+        "y": 220,
+        "wires": [
+            [
+                "a101010101010103"
+            ]
+        ]
+    },
+    {
+        "id": "430cf0a08d53e90d",
+        "type": "inject",
+        "z": "820149a70f749c7f",
+        "name": "Robot False",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "false",
+        "payloadType": "bool",
+        "x": 850,
+        "y": 140,
+        "wires": [
+            [
+                "147a09f1759b053c"
+            ]
+        ]
+    },
+    {
+        "id": "214fac25bc6a6ee3",
+        "type": "inject",
+        "z": "820149a70f749c7f",
+        "name": "Robot True",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 860,
+        "y": 200,
+        "wires": [
+            [
+                "5186ddd7ee923da6"
+            ]
+        ]
+    },
+    {
+        "id": "a444177e69678651",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Robot Out",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1470,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "a404040404040406",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Joints Func",
+        "func": "msg.payload = JSON.stringify({ \n    joint1: msg.joint1, \n    joint2: msg.joint2, \n    joint3: msg.joint3,\n    joint4: msg.joint4, \n    joint5: msg.joint5, \n    joint6: msg.joint6\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1210,
+        "y": 780,
+        "wires": [
+            [
+                "a404040404040402",
+                "a404040404040405"
+            ]
+        ]
+    },
+    {
+        "id": "b303030303030301",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Status",
+        "rules": [
+            {
+                "t": "set",
+                "p": "status",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 950,
+        "y": 400,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "b404040404040401",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 1",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint1",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 660,
+        "wires": [
+            [
+                "a404040404040406"
+            ]
+        ]
+    },
+    {
+        "id": "b606060606060601",
+        "type": "inject",
+        "z": "820149a70f749c7f",
+        "name": "speak-out test",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "Hello there",
+        "payloadType": "str",
+        "x": 1010,
+        "y": 1240,
+        "wires": [
+            [
+                "a606060606060602"
+            ]
+        ]
+    },
+    {
+        "id": "0a099e23f4c1afb5",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Robot Func",
+        "func": "return { \n    robotstatus: JSON.parse(msg.payload).robotstatus\n};",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 310,
+        "y": 160,
+        "wires": [
+            [
+                "66d0cc9af5a80731"
+            ]
+        ]
+    },
+    {
+        "id": "a084bdf41676da4a",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Robot WS in",
+        "info": "",
+        "x": 130,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "c2dda8a22072725f",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Robot WS Out",
+        "info": "",
+        "x": 1410,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "66d0cc9af5a80731",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "robotstatus",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 480,
+        "y": 160,
+        "wires": [
+            [
+                "b7de3cfd4c637805"
+            ]
+        ]
+    },
+    {
+        "id": "b7de3cfd4c637805",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Robot Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 650,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "0a1480968b8dac83",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Velocity WS in",
+        "info": "",
+        "x": 150,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "bda4e1d50bf7483a",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Velocity",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "velocity",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 460,
+        "y": 460,
+        "wires": [
+            [
+                "a202020202020204"
+            ]
+        ]
+    },
+    {
+        "id": "1c1a5132830fedeb",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Status WS Out",
+        "info": "",
+        "x": 1440,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "55ba1d5d44813a0a",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Message",
+        "rules": [
+            {
+                "t": "set",
+                "p": "message",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 960,
+        "y": 360,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "1cd1c9e54cfa0fb3",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Connection",
+        "rules": [
+            {
+                "t": "set",
+                "p": "connection",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 440,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "4a8fb9e7411c2b7b",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Command",
+        "rules": [
+            {
+                "t": "set",
+                "p": "command",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 480,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "cf60ada7193078a5",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Active Joint",
+        "rules": [
+            {
+                "t": "set",
+                "p": "activeJoint",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 520,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "3dbbc4d0692ee13a",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Arm State",
+        "rules": [
+            {
+                "t": "set",
+                "p": "armState",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 960,
+        "y": 560,
+        "wires": [
+            [
+                "a303030303030302"
+            ]
+        ]
+    },
+    {
+        "id": "3626b784926ba6ef",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Joints WS Out",
+        "info": "",
+        "x": 1390,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "7eb0bbb530495ac9",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Speak WS OUT",
+        "info": "",
+        "x": 1400,
+        "y": 1140,
+        "wires": []
+    },
+    {
+        "id": "d7b83d0a5f1f2868",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Voice WS IN",
+        "info": "",
+        "x": 190,
+        "y": 1180,
+        "wires": []
+    },
+    {
+        "id": "f27291568ab4f5b8",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Joints WS IN",
+        "info": "",
+        "x": 170,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "2324c34b3829f5d0",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Joints Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 310,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "13e88c2609b04fdb",
+        "type": "comment",
+        "z": "820149a70f749c7f",
+        "name": "Presets / Program ID WS IN",
+        "info": "",
+        "x": 240,
+        "y": 1000,
+        "wires": []
+    },
+    {
+        "id": "35d511235cba46ee",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Preset",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "preset",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 650,
+        "y": 1020,
+        "wires": [
+            [
+                "a505050505050504"
+            ]
+        ]
+    },
+    {
+        "id": "a32be1a9d780b04d",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Program",
+        "rules": [
+            {
+                "t": "set",
+                "p": "message",
+                "pt": "msg",
+                "to": "program",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 640,
+        "y": 1100,
+        "wires": [
+            [
+                "b4b76c7a87d77ab6"
+            ]
+        ]
+    },
+    {
+        "id": "b4b76c7a87d77ab6",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Program Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 820,
+        "y": 1100,
+        "wires": []
+    },
+    {
+        "id": "03ea5c84ed609d56",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 1",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint1",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 660,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "765cbd54e9465b02",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 2",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint2",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 700,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "5b903e1c1723ee89",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 3",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint3",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 740,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "c88cd36b1e518bc4",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 4",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint4",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 780,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "8fa4faf7027a9272",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 5",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint5",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 820,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "a52481bce96b1e1a",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 6",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint6",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 860,
+        "wires": [
+            [
+                "fe17002c9be8805d"
+            ]
+        ]
+    },
+    {
+        "id": "fe17002c9be8805d",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "J",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 750,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "7205b1365ba01585",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 2",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint2",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 700,
+        "wires": [
+            [
+                "a404040404040406"
+            ]
+        ]
+    },
+    {
+        "id": "4bbae8a21c0cc784",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 3",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint3",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 740,
+        "wires": [
+            [
+                "a404040404040406"
+            ]
+        ]
+    },
+    {
+        "id": "c51225dbb725011d",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 4",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint4",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 780,
+        "wires": [
+            [
+                "a404040404040406"
+            ]
+        ]
+    },
+    {
+        "id": "c37e85be4dbf2649",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 5",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint5",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 820,
+        "wires": [
+            [
+                "a404040404040406"
+            ]
+        ]
+    },
+    {
+        "id": "2634bb0ac70c31a4",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint 6",
+        "rules": [
+            {
+                "t": "set",
+                "p": "joint6",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 970,
+        "y": 860,
+        "wires": [
+            [
+                "a404040404040406"
             ]
         ]
     }

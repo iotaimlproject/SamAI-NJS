@@ -47,14 +47,14 @@ export function PositionControls({
       title="Position Controls"
       subtitle="Presets · speed · single-axis move"
       tone="amber"
-      icon={<FontAwesomeIcon icon={faLocationCrosshairs} style={{ fontSize: 14 }} />}
+      icon={<FontAwesomeIcon icon={faLocationCrosshairs} style={{ fontSize: 11 }} />}
       action={<span className="robot-panel__action-chip">J{joint + 1} · {shown}°</span>}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, alignItems: "end" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, alignItems: "end" }}>
         <div>
-          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 4, display: "block" }}>Speed</Label>
+          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 3, display: "block" }}>Speed</Label>
           <Select value={velocity} onValueChange={(v) => onVelocity(v as Velocity)} disabled={!robotOn}>
-            <SelectTrigger className="h-9 rounded-lg px-3 text-sm font-semibold disabled:opacity-50 mod-field" data-tint="amber">
+            <SelectTrigger className="h-8 rounded-lg px-3 text-xs font-semibold disabled:opacity-50 mod-field" data-tint="amber">
               <SelectValue />
             </SelectTrigger>
             <SelectContent style={{ background: "var(--panel)", borderColor: "var(--hairline)" }}>
@@ -64,9 +64,9 @@ export function PositionControls({
           </Select>
         </div>
         <div>
-          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 4, display: "block" }}>Joint</Label>
+          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 3, display: "block" }}>Joint</Label>
           <Select value={String(joint)} onValueChange={(v) => setJoint(Number(v))} disabled={!robotOn}>
-            <SelectTrigger className="h-9 rounded-lg px-3 text-sm font-semibold disabled:opacity-50 mod-field" data-tint="amber">
+            <SelectTrigger className="h-8 rounded-lg px-3 text-xs font-semibold disabled:opacity-50 mod-field" data-tint="amber">
               <SelectValue />
             </SelectTrigger>
             <SelectContent style={{ background: "var(--panel)", borderColor: "var(--hairline)" }}>
@@ -77,17 +77,17 @@ export function PositionControls({
           </Select>
         </div>
         <div>
-          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 4, display: "block" }}>Angle</Label>
-          <Input type="text" inputMode="numeric" value={angleText} onChange={(e) => { const v = e.target.value; if (/^-?\d{0,4}$/.test(v)) setAngleText(v); }} onBlur={commitAngle} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} disabled={!robotOn} className="h-9 rounded-lg px-3 text-sm mono-readout font-semibold text-center disabled:opacity-50 mod-field" data-tint="amber" />
+          <Label className="micro-label" style={{ fontSize: 9, marginBottom: 3, display: "block" }}>Angle</Label>
+          <Input type="text" inputMode="numeric" value={angleText} onChange={(e) => { const v = e.target.value; if (/^-?\d{0,4}$/.test(v)) setAngleText(v); }} onBlur={commitAngle} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} disabled={!robotOn} className="h-8 rounded-lg px-3 text-xs mono-readout font-semibold text-center disabled:opacity-50 mod-field" data-tint="amber" />
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 6 }}>
         {PRESETS.map((b) => (
           <Button
             key={b.preset}
             onClick={() => onPreset(b.preset)}
             disabled={!robotOn}
-            className="h-10 rounded-lg text-xs font-bold preset-btn"
+            className="h-9 rounded-lg text-xs font-bold preset-btn"
             data-tint={b.tint}
           >
             <span className="preset-btn__icon" aria-hidden="true">
@@ -102,7 +102,7 @@ export function PositionControls({
         disabled={!robotOn}
         className="h-9 rounded-lg text-xs font-bold w-full preset-btn preset-btn--move"
         data-tint="amber"
-        style={{ marginTop: 8 }}
+        style={{ marginTop: 6 }}
       >
         <span className="preset-btn__icon" aria-hidden="true">
           <FontAwesomeIcon icon={faArrowsUpDown} style={{ fontSize: 11 }} />

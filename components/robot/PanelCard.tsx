@@ -32,7 +32,7 @@ export function PanelCard({
   return (
     <section className={`instrument robot-panel robot-panel--tone-${tone}${className ? ` ${className}` : ""}`} style={style} aria-label={title}>
       <div className="robot-panel__head">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {icon ? (
             <span className="panel-icon" aria-hidden="true">
               {icon}

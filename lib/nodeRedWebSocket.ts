@@ -1,5 +1,8 @@
 export const NODE_RED_HOSTS = {
-  production: { protocol: "wss", host: "node-dev.iotaiml.dpdns.org" },
+  production: {
+    protocol: process.env.NEXT_PUBLIC_NODE_RED_PROTOCOL ?? "wss",
+    host: process.env.NEXT_PUBLIC_NODE_RED_HOST ?? "node-dev.iotaiml.dpdns.org",
+  },
 } as const;
 
 type Host = (typeof NODE_RED_HOSTS)[keyof typeof NODE_RED_HOSTS];
@@ -23,8 +26,10 @@ const buildUrl = (path: string, host: Host = NODE_RED_HOSTS.production) =>
 
 export const NODE_RED_WS_PATHS = {
   robot: "/ws/robot",
-  gripper: "/ws/gripper",
+  velocity: "/ws/velocity",
+  status: "/ws/status",
   joints: "/ws/joints",
+  preset: "/ws/preset",
   speak: "/ws/speak",
   voice: "/ws/voice",
 } as const;
@@ -33,8 +38,10 @@ export type NodeRedPath = (typeof NODE_RED_WS_PATHS)[keyof typeof NODE_RED_WS_PA
 
 export const NODE_RED_WS_URLS = {
   robot: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.robot, host),
-  gripper: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.gripper, host),
+  velocity: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.velocity, host),
+  status: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.status, host),
   joints: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.joints, host),
+  preset: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.preset, host),
   speak: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.speak, host),
   voice: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.voice, host),
 };

@@ -34,7 +34,7 @@ const nextConfig = {
               "worker-src 'self' blob:",
               "child-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'",
-              "connect-src 'self' wss://node-dev.iotaiml.dpdns.org wss://api.deepgram.com https://api.deepgram.com https://cloudflareinsights.com",
+              "connect-src 'self' ws://localhost:1880 http://localhost:1880 wss://api.deepgram.com https://api.deepgram.com https://cloudflareinsights.com",
               "media-src 'self' blob: https://api.deepgram.com",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",

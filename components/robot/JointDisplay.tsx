@@ -21,21 +21,21 @@ export function JointDisplay({ joints, pose, robotOn }: { joints: number[]; pose
       title="Joint Display"
       subtitle="6-axis · live tool pose"
       tone="violet"
-      icon={<FontAwesomeIcon icon={faRobot} style={{ fontSize: 14 }} />}
+      icon={<FontAwesomeIcon icon={faRobot} style={{ fontSize: 11 }} />}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 5 }}>
         {joints.map((val, idx) => (
           <div key={idx} className="joint-cell" data-tint="violet" data-soft="true">
-            <span className="mono-readout joint-cell__tag" style={{ fontSize: 9, fontWeight: 700 }}>J{idx + 1}</span>
-            <span className="mono-readout" style={{ fontSize: 12, fontWeight: 800, color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{Math.round(val)}°</span>
+            <span className="mono-readout joint-cell__tag" style={{ fontSize: 8, fontWeight: 700 }}>J{idx + 1}</span>
+            <span className="mono-readout" style={{ fontSize: 11, fontWeight: 800, color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{Math.round(val)}°</span>
           </div>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 5, marginTop: 6 }}>
         {POSE_CELLS.map((c) => (
           <div key={c.key} className="pose-cell" data-tint="violet" data-soft="true">
-            <span className="micro-label pose-cell__tag" style={{ fontSize: 9 }}>{c.label}</span>
-            <span className="mono-readout" style={{ fontSize: 12, fontWeight: 800, color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{fmt(pose?.[c.key])}</span>
+            <span className="micro-label pose-cell__tag" style={{ fontSize: 8 }}>{c.label}</span>
+            <span className="mono-readout" style={{ fontSize: 11, fontWeight: 800, color: robotOn ? "var(--ink)" : "var(--ink-faint)" }}>{fmt(pose?.[c.key])}</span>
           </div>
         ))}
       </div>

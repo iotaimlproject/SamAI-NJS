@@ -3,7 +3,7 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPowerOff } from "@fortawesome/free-solid-svg-icons";
 
-export function RobotSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+export function RobotSwitch({ checked, led, onChange }: { checked: boolean; led: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       type="button"
@@ -13,6 +13,7 @@ export function RobotSwitch({ checked, onChange }: { checked: boolean; onChange:
       onClick={() => onChange(!checked)}
       className="robot-switch"
       data-on={checked}
+      data-led={led}
     >
       <span className="robot-switch__body" aria-hidden="true">
         <span className="robot-switch__fill" />
