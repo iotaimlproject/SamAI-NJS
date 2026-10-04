@@ -489,6 +489,13 @@
         "userprivatekey": ""
     },
     {
+        "id": "cfg-wsmovejoint",
+        "type": "websocket-listener",
+        "z": "820149a70f749c7f",
+        "path": "/ws/movejoint",
+        "wholemsg": "false"
+    },
+    {
         "id": "cfg-wsrobot",
         "type": "websocket-listener",
         "z": "820149a70f749c7f",
@@ -5019,15 +5026,14 @@
         "id": "a404040404040401",
         "type": "websocket in",
         "z": "820149a70f749c7f",
-        "name": "/ws/joints WS IN",
-        "server": "cfg-wsjoints",
+        "name": "/ws/movejoint WS IN",
+        "server": "cfg-wsmovejoint",
         "client": "",
-        "x": 180,
+        "x": 190,
         "y": 740,
         "wires": [
             [
-                "a404040404040403",
-                "2324c34b3829f5d0"
+                "4dce3dfa91795432"
             ]
         ]
     },
@@ -5041,31 +5047,6 @@
         "x": 1430,
         "y": 740,
         "wires": []
-    },
-    {
-        "id": "a404040404040403",
-        "type": "function",
-        "z": "820149a70f749c7f",
-        "name": "Joints Func",
-        "func": "var d =JSON.parse(msg.payload);\nmsg.payload = { \n    joint1: d.joint1, \n    joint2: d.joint2, \n    joint3: d.joint3, \n    joint4: d.joint4, \n    joint5: d.joint5, \n    joint6: d.joint6 \n};\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 390,
-        "y": 740,
-        "wires": [
-            [
-                "03ea5c84ed609d56",
-                "765cbd54e9465b02",
-                "5b903e1c1723ee89",
-                "c88cd36b1e518bc4",
-                "8fa4faf7027a9272",
-                "a52481bce96b1e1a"
-            ]
-        ]
     },
     {
         "id": "a404040404040405",
@@ -5119,23 +5100,6 @@
                 "a32be1a9d780b04d"
             ]
         ]
-    },
-    {
-        "id": "a505050505050504",
-        "type": "debug",
-        "z": "820149a70f749c7f",
-        "name": "Preset Debug",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 820,
-        "y": 1020,
-        "wires": []
     },
     {
         "id": "a606060606060601",
@@ -5791,23 +5755,6 @@
         "wires": []
     },
     {
-        "id": "2324c34b3829f5d0",
-        "type": "debug",
-        "z": "820149a70f749c7f",
-        "name": "Joints Debug",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 310,
-        "y": 800,
-        "wires": []
-    },
-    {
         "id": "13e88c2609b04fdb",
         "type": "comment",
         "z": "820149a70f749c7f",
@@ -5827,7 +5774,7 @@
                 "t": "set",
                 "p": "payload",
                 "pt": "msg",
-                "to": "preset",
+                "to": "payload.preset",
                 "tot": "msg"
             }
         ],
@@ -5837,10 +5784,10 @@
         "to": "",
         "reg": false,
         "x": 650,
-        "y": 1020,
+        "y": 980,
         "wires": [
             [
-                "a505050505050504"
+                "c1a7b8567fb5c2b5"
             ]
         ]
     },
@@ -5852,9 +5799,9 @@
         "rules": [
             {
                 "t": "set",
-                "p": "message",
+                "p": "payload",
                 "pt": "msg",
-                "to": "program",
+                "to": "payload.program",
                 "tot": "msg"
             }
         ],
@@ -5863,8 +5810,8 @@
         "from": "",
         "to": "",
         "reg": false,
-        "x": 640,
-        "y": 1100,
+        "x": 660,
+        "y": 1120,
         "wires": [
             [
                 "b4b76c7a87d77ab6"
@@ -5884,187 +5831,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 820,
-        "y": 1100,
-        "wires": []
-    },
-    {
-        "id": "03ea5c84ed609d56",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 1",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint1",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 660,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "765cbd54e9465b02",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 2",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint2",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 700,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "5b903e1c1723ee89",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 3",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint3",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 740,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "c88cd36b1e518bc4",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 4",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint4",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 780,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "8fa4faf7027a9272",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 5",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint5",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 820,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "a52481bce96b1e1a",
-        "type": "change",
-        "z": "820149a70f749c7f",
-        "name": "Joint 6",
-        "rules": [
-            {
-                "t": "set",
-                "p": "joint6",
-                "pt": "msg",
-                "to": "payload",
-                "tot": "msg"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 590,
-        "y": 860,
-        "wires": [
-            [
-                "fe17002c9be8805d"
-            ]
-        ]
-    },
-    {
-        "id": "fe17002c9be8805d",
-        "type": "debug",
-        "z": "820149a70f749c7f",
-        "name": "J",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 750,
-        "y": 720,
+        "x": 840,
+        "y": 1120,
         "wires": []
     },
     {
@@ -6201,5 +5969,194 @@
                 "a404040404040406"
             ]
         ]
+    },
+    {
+        "id": "4dce3dfa91795432",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Joints Func",
+        "func": "var d =JSON.parse(msg.payload);\nmsg.payload = { \n    joint: d.joint,\n    angle: d.angle\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 740,
+        "wires": [
+            [
+                "7d79d0a1ea6528bb",
+                "a3c7b42ba1151128"
+            ]
+        ]
+    },
+    {
+        "id": "7d79d0a1ea6528bb",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Joint",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.joint",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 570,
+        "y": 700,
+        "wires": [
+            [
+                "29847ba144fdfee1"
+            ]
+        ]
+    },
+    {
+        "id": "a3c7b42ba1151128",
+        "type": "change",
+        "z": "820149a70f749c7f",
+        "name": "Angle",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.angle",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 570,
+        "y": 780,
+        "wires": [
+            [
+                "29847ba144fdfee1"
+            ]
+        ]
+    },
+    {
+        "id": "29847ba144fdfee1",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "J",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 730,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "c1a7b8567fb5c2b5",
+        "type": "function",
+        "z": "820149a70f749c7f",
+        "name": "Preset Modes",
+        "func": "const preset = msg.payload;\n\nif (preset === undefined || preset === null) {\n    return null;\n}\n\nconst signal = (name) => ({\n    payload: preset === name,\n    preset: preset\n});\n\nreturn [\n    signal(\"home\"),\n    signal(\"reset fault\"),\n    signal(\"a\"),\n    signal(\"b\")\n];",
+        "outputs": 4,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 840,
+        "y": 980,
+        "wires": [
+            [
+                "82cd5d173e565398"
+            ],
+            [
+                "e8885ac1d41f6e50"
+            ],
+            [
+                "a3536cca08b950b6"
+            ],
+            [
+                "470481415d53bea8"
+            ]
+        ]
+    },
+    {
+        "id": "82cd5d173e565398",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Home",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1030,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "e8885ac1d41f6e50",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Reset Fault",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1050,
+        "y": 960,
+        "wires": []
+    },
+    {
+        "id": "a3536cca08b950b6",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Position A",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1000,
+        "wires": []
+    },
+    {
+        "id": "470481415d53bea8",
+        "type": "debug",
+        "z": "820149a70f749c7f",
+        "name": "Position B",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1040,
+        "wires": []
     }
 ]

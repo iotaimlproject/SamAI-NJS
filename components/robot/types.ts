@@ -14,7 +14,7 @@ export type RobotLog = {
 
 export type JointLimit = { min: number; max: number };
 
-export type PositionPreset = "home" | "retreat" | "a" | "b";
+export type PositionPreset = "home" | "reset fault" | "a" | "b";
 
 export type Pose = {
   x: number | null;
@@ -29,11 +29,11 @@ export type ProgramId = "packing" | "labelling" | "riveting" | "cutting";
 
 export const JOINT_COUNT = 6;
 
-export const JOINT_LIMITS: JointLimit[] = Array.from({ length: JOINT_COUNT }, () => ({ min: 0, max: 360 }));
+export const JOINT_LIMITS: JointLimit[] = Array.from({ length: JOINT_COUNT }, () => ({ min: -360, max: 360 }));
 
 export const HOME_JOINTS = [0, 15, 180, 230, 0, 55];
 
-export const RETREAT_JOINTS = [0, 30, 180, 200, 0, 40];
+export const RESET_FAULT_JOINTS = [0, 30, 180, 200, 0, 40];
 
 export function nowTime(): string {
   return new Date().toLocaleTimeString("en-IN", { hour12: true });

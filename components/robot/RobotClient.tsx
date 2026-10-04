@@ -15,7 +15,7 @@ import { PositionControls } from "./PositionControls";
 import { ProgramPanel } from "./ProgramPanel";
 import { Voice } from "./VoiceBar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HOME_JOINTS, RETREAT_JOINTS, pushLog, type Pose, type PositionPreset, type ProgramId, type RobotLog, type Velocity } from "./types";
+import { HOME_JOINTS, RESET_FAULT_JOINTS, pushLog, type Pose, type PositionPreset, type ProgramId, type RobotLog, type Velocity } from "./types";
 
 export default function RobotClient() {
   const [mounted, setMounted] = useState(false);
@@ -214,15 +214,8 @@ export default function RobotClient() {
     next[joint] = angle;
     setJoints(next);
     setActiveJoint(joint);
-    sendNodeRedMessage(NODE_RED_WS_PATHS.joints, {
-      joint1: next[0],
-      joint2: next[1],
-      joint3: next[2],
-      joint4: next[3],
-      joint5: next[4],
-      joint6: next[5],
-    });
-    log(`J${joint + 1} → ${angle}°`, "info", "joints");
+    sendNodeRedMessage(NODE_RED_WS_PATHS.movejoint, { joint: joint + 1, angle });
+    log(`J${joint + 1} → ${angle}°`, "info", "movejoint");
   };
 
   const goPreset = (preset: PositionPreset) => {
@@ -234,10 +227,10 @@ export default function RobotClient() {
       log("Robot → Home", "info", "joints home");
       return;
     }
-    if (preset === "retreat") {
-      setJoints([...RETREAT_JOINTS]);
-      sendNodeRedMessage(NODE_RED_WS_PATHS.preset, { preset: "retreat" });
-      log("Reset fault", "info", "joints retreat");
+    if (preset === "reset fault") {
+      setJoints([...RESET_FAULT_JOINTS]);
+      sendNodeRedMessage(NODE_RED_WS_PATHS.preset, { preset: "reset fault" });
+      log("Reset fault", "info", "joints reset fault");
       return;
     }
     sendNodeRedMessage(NODE_RED_WS_PATHS.preset, { preset });

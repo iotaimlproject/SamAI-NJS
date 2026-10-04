@@ -12,7 +12,7 @@ import { PanelCard } from "./PanelCard";
 
 const PRESETS: Array<{ label: string; preset: PositionPreset; tint: "green" | "red" | "blue" | "violet"; icon: typeof faHouse }> = [
   { label: "Home", preset: "home", tint: "green", icon: faHouse },
-  { label: "Reset Fault", preset: "retreat", tint: "red", icon: faArrowsRotate },
+  { label: "Reset Fault", preset: "reset fault", tint: "red", icon: faArrowsRotate },
   { label: "Position A", preset: "a", tint: "blue", icon: faA },
   { label: "Position B", preset: "b", tint: "violet", icon: faB },
 ];

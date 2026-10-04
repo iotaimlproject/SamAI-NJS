@@ -70,7 +70,7 @@ No `device`/`source` keys. Out-shape matches in-shape per channel.
 | `/ws/velocity` | app → NR | `{ velocity: "fast" \| "slow" }` |
 | `/ws/status` | NR → app | `{ message, status, connection, command, activeJoint, armState }` (strings; `activeJoint` `"J1"`–`"J6"`/`"NONE"`, bare number `n` also accepted → `J{n+1}`) |
 | `/ws/joints` | both ways | full `{ joint1…joint6: number }`, degrees 0–360 |
-| `/ws/preset` | app → NR | `{ preset: "home" \| "retreat" \| "a" \| "b" }` or `{ program: "packing" \| "labelling" \| "riveting" \| "cutting" }` |
+| `/ws/preset` | app → NR | `{ preset: "home" \| "reset fault" \| "a" \| "b" }` or `{ program: "packing" \| "labelling" \| "riveting" \| "cutting" }` |
 | `/ws/speak` | NR → app | `{ text: string }` (reply → transcript box + TTS) |
 | `/ws/voice` | app → NR | `{ text: string }` (transcript) |
 
