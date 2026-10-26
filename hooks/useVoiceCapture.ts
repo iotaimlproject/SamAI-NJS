@@ -24,6 +24,9 @@ type SpeechRecognitionInstance = {
   onnomatch: (() => void) | null;
 };
 
+const BENIGN_RECOGNITION_ERRORS = new Set(["aborted", "no-speech"]);
+const FATAL_RECOGNITION_ERRORS = new Set(["not-allowed", "service-not-allowed", "audio-capture"]);
+
 export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onResult?: (_transcript: string, _isFinal: boolean) => void }) {
   const [listening, setListening] = useState(false);
   const [text, setText] = useState("");
@@ -57,17 +60,28 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
   }, []);
 
   useEffect(() => {
+    if (!enabled || resolvedKey) return;
     let cancelled = false;
     fetch("/api/deepgram/token")
       .then(async (r) => {
-        if (!r.ok) return;
+        if (!r.ok || r.status === 204) return;
         const d = await r.json() as { access_token?: string; key?: string };
         const tok = d.access_token || d.key || "";
         if (!cancelled && tok) setResolvedKey(tok);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [enabled, resolvedKey]);
+
+  const stopRecognition = () => {
+    const rec = recognitionRef.current;
+    recognitionRef.current = null;
+    if (!rec) return;
+    rec.onresult = null;
+    rec.onerror = null;
+    rec.onend = null;
+    try { rec.abort(); } catch {}
+  };
 
   const startBrowserSTT = (activeRef: { current: boolean }) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -114,7 +128,15 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         }
       };
       rec.onerror = (e) => {
-        console.error("[STT] browser recognition error:", (e as { error?: string })?.error || e);
+        const error = (e as { error?: string })?.error ?? "unknown";
+        if (BENIGN_RECOGNITION_ERRORS.has(error)) return;
+        if (FATAL_RECOGNITION_ERRORS.has(error)) {
+          activeRef.current = false;
+          stopRecognition();
+          setListening(false);
+          setText("Microphone unavailable — check browser permission");
+        }
+        console.warn("[STT] browser recognition error:", error);
       };
       rec.onend = () => {
         if (activeRef.current) {
@@ -139,9 +161,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       sessionRef.current?.stop();
       sessionRef.current = null;
-      try { recognitionRef.current?.abort(); } catch {}
-      try { recognitionRef.current?.stop(); } catch {}
-      recognitionRef.current = null;
+      stopRecognition();
       setListening(false);
       if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
       return;
@@ -165,9 +185,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         if (finalDebounce) clearTimeout(finalDebounce);
         if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-        try { recognitionRef.current?.abort(); } catch {}
-        try { recognitionRef.current?.stop(); } catch {}
-        recognitionRef.current = null;
+        stopRecognition();
         setListening(false);
         setInterim("");
       };
@@ -180,19 +198,8 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
         onOpen: () => {
           if (!active) return;
           deepgramFailsRef.current = 0;
-          const rec = recognitionRef.current;
-          recognitionRef.current = null;
-          if (rec) {
-            console.log("[STT] Deepgram live, browser fallback stopped");
-            try {
-              rec.onend = null;
-            } catch {}
-            try {
-              rec.abort();
-            } catch {}
-          } else {
-            console.log("[STT] Deepgram live");
-          }
+          console.log(recognitionRef.current ? "[STT] Deepgram live, browser fallback stopped" : "[STT] Deepgram live");
+          stopRecognition();
           setListening(true);
         },
         onTranscript: ({ transcript, isFinal, speechFinal }) => {
@@ -259,9 +266,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       sessionRef.current?.stop();
       sessionRef.current = null;
-      try { recognitionRef.current?.abort(); } catch {}
-      try { recognitionRef.current?.stop(); } catch {}
-      recognitionRef.current = null;
+      stopRecognition();
       setListening(false);
       setInterim("");
     };
@@ -281,9 +286,7 @@ export function useVoiceCapture({ enabled, onResult }: { enabled: boolean; onRes
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       sessionRef.current?.stop();
       sessionRef.current = null;
-      try { recognitionRef.current?.abort(); } catch {}
-      try { recognitionRef.current?.stop(); } catch {}
-      recognitionRef.current = null;
+      stopRecognition();
     },
   };
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const apiKey = process.env.DEEPGRAM_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "DEEPGRAM_API_KEY not configured" }, { status: 500 });
+  if (!apiKey) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 
   const res = await fetch("https://api.deepgram.com/v1/auth/grant", {
     method: "POST",

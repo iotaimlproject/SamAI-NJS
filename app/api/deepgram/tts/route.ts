@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.DEEPGRAM_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "DEEPGRAM_API_KEY not configured" }, { status: 500 });
+  if (!apiKey) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 
   const { text, model = "flux-priya-en" } = await req.json();
   if (!text?.trim()) return NextResponse.json({ error: "text required" }, { status: 400 });

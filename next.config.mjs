@@ -1,3 +1,5 @@
+const cctvOrigin = URL.canParse(process.env.CCTV_STREAM_URL ?? "") ? new URL(process.env.CCTV_STREAM_URL).origin : "";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -33,6 +35,7 @@ const nextConfig = {
               "script-src-elem 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com",
               "worker-src 'self' blob:",
               "child-src 'self' blob:",
+              `frame-src 'self' ${cctvOrigin}`.trim(),
               "style-src 'self' 'unsafe-inline'",
               "connect-src 'self' wss://node-dev.iotaiml.dpdns.org wss://api.deepgram.com https://api.deepgram.com https://cloudflareinsights.com",
               "media-src 'self' blob: https://api.deepgram.com",

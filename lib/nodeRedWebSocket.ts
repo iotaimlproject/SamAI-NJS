@@ -22,42 +22,16 @@ const buildUrl = (path: string, host: Host = NODE_RED_HOSTS.production) =>
   `${host.protocol}://${host.host}${path.startsWith("/") ? path : `/${path}`}`;
 
 export const NODE_RED_WS_PATHS = {
+  dashboard: "/ws/dashboard",
+  data: "/ws/data",
   machine: "/ws/machine",
-  robot: "/ws/robot",
-  gripper: "/ws/gripper",
-  joints: "/ws/joints",
-  telemetry: "/ws/telemetry",
-  orderData: "/ws/orderData",
-  slno: "/ws/slno",
-  itemlist: "/ws/itemlist",
-  popupdata: "/ws/popupdata",
-  dateTime: "/ws/dateTime",
-  placeOrder: "/ws/placeOrder",
   stop: "/ws/stop",
-  reset: "/ws/reset",
   speak: "/ws/speak",
   voice: "/ws/voice",
 } as const;
 
 export type NodeRedPath = (typeof NODE_RED_WS_PATHS)[keyof typeof NODE_RED_WS_PATHS];
 
-export const NODE_RED_WS_URLS = {
-  machine: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.machine, host),
-  robot: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.robot, host),
-  gripper: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.gripper, host),
-  joints: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.joints, host),
-  telemetry: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.telemetry, host),
-  orderData: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.orderData, host),
-  slno: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.slno, host),
-  itemlist: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.itemlist, host),
-  popupdata: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.popupdata, host),
-  dateTime: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.dateTime, host),
-  placeOrder: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.placeOrder, host),
-  stop: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.stop, host),
-  reset: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.reset, host),
-  speak: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.speak, host),
-  voice: (host?: Host) => buildUrl(NODE_RED_WS_PATHS.voice, host),
-};
 
 export type SocketHandlers = {
   onopen?: () => void;

@@ -308,6 +308,16 @@ export async function startMicrophoneStt({
   }
 }
 
+class DeepgramUnavailableError extends Error {
+  constructor() {
+    super("Deepgram TTS is not configured");
+  }
+}
+
+let deepgramTtsUnavailable = false;
+
+const BENIGN_SYNTHESIS_ERRORS = new Set(["interrupted", "canceled"]);
+
 export async function speakText({
   text,
   apiKey = DEFAULT_API_KEY,
@@ -332,6 +342,7 @@ export async function speakText({
       body: JSON.stringify({ text, model, speed, expressivity }),
       signal,
     });
+    if (res.status === 204) throw new DeepgramUnavailableError();
     if (!res.ok) throw new Error(`Deepgram TTS proxy failed: ${await res.text()}`);
     return res.blob();
   }
@@ -429,7 +440,7 @@ async function speakTextWithRetry(args: {
   try {
     return await speakText(args);
   } catch (err) {
-    if (args.signal?.aborted) throw err;
+    if (args.signal?.aborted || err instanceof DeepgramUnavailableError) throw err;
     console.warn("[TTS] fetch failed, retrying once:", (err as Error)?.message);
     await new Promise((r) => setTimeout(r, 600));
     if (args.signal?.aborted) throw err;
@@ -508,6 +519,7 @@ export async function speakNodeRedText({
   ttsAbort = new AbortController();
   const signal = ttsAbort.signal;
   const aborted = () => signal.aborted || superseded();
+  if (deepgramTtsUnavailable) return browserSpeakFallback(clean, "deepgram-unconfigured");
   let blob: Blob;
   try {
     const started = Date.now();
@@ -521,6 +533,11 @@ export async function speakNodeRedText({
     if (aborted()) {
       console.log("[TTS] superseded fetch aborted, dropping");
       return null;
+    }
+    if (err instanceof DeepgramUnavailableError) {
+      deepgramTtsUnavailable = true;
+      console.info("[TTS] DEEPGRAM_API_KEY not set, using browser speech");
+      return browserSpeakFallback(clean, "deepgram-unconfigured");
     }
     console.error("[TTS] fetch failed after retry:", (err as Error)?.message, "| text:", clean.slice(0, 80));
     return browserSpeakFallback(clean, "fetch-failed");
@@ -568,7 +585,7 @@ function browserSpeakFallback(text: string, reason: string): SpeechSynthesisUtte
   u.pitch = 1;
   u.volume = 1;
   const voices = window.speechSynthesis.getVoices();
-  if (voices.length === 0) console.error("[TTS] no speechSynthesis voices loaded, fallback may be silent, reason:", reason);
+  if (voices.length === 0) console.warn("[TTS] no speechSynthesis voices loaded, fallback may be silent, reason:", reason);
   u.onstart = () => {
     console.log("[TTS] browser fallback started (" + reason + "):", text.slice(0, 40));
     setSpeaking(true);
@@ -578,7 +595,7 @@ function browserSpeakFallback(text: string, reason: string): SpeechSynthesisUtte
     setSpeaking(false);
   };
   u.onerror = (e) => {
-    console.error("[TTS] browser fallback error:", e.error || e.type);
+    if (!BENIGN_SYNTHESIS_ERRORS.has(e.error)) console.error("[TTS] browser fallback error:", e.error || e.type);
     setSpeaking(false);
   };
   window.speechSynthesis.speak(u);

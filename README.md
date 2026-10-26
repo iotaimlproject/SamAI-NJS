@@ -1,76 +1,48 @@
-# SamAI Dashboard
+# SamAI Performance Dashboard
 
-Industrial realtime manufacturing control panel — Next.js 15 (App Router, TSX) + shadcn/ui + Tailwind, WebSocket control for Node-RED, voice control via Deepgram STT/TTS. Migrated from Vite+React (see `MIGRATION.md`).
-
-## Features
-
-- Real-time machine status and OEE metrics (availability/performance/quality)
-- Voice commands: microphone → Deepgram STT → `/ws/speak` → Node-RED → `/ws/voice` → Deepgram TTS
-- 8 independent Node-RED WebSockets with bounded queue + exponential reconnect (capped 30s)
-- Dark/Light theme (next/font IBM Plex Sans/Mono)
-- Responsive industrial card layout (460px, mobile full-bleed)
-- Production order management (SlNo/Item/SetQty/DateTime, placeOrder/stop/reset)
+Realtime OEE / production dashboard driven by Node-RED over WebSockets, with Deepgram voice control.
+Next.js 16 (App Router) · React 19 · shadcn/ui (Tailwind v4) · Recharts.
 
 ## Setup
 
-### Install dependencies
-
 ```bash
 pnpm install
+cp .env.example .env.local   # fill DEEPGRAM_API_KEY, SESSION_SECRET, CCTV_STREAM_URL; access code defaults to 123456
+pnpm dev                     # http://localhost:5175
 ```
 
-### Environment Configuration
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Dev server on `0.0.0.0:5175` |
+| `pnpm build` / `pnpm start` | Production build / server on `:5175` |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm check` | Session-token self-check |
 
-Create `.env.local` (preferred) — `.env` with `VITE_DEEPGRAM_API_KEY` still works via fallback:
+## Access
 
-```env
-NEXT_PUBLIC_DEEPGRAM_API_KEY=your_40char_project_api_key
-# or server-only (hides key via /api/deepgram/*):
-DEEPGRAM_API_KEY=your_40char_project_api_key
-```
+`/login` takes a single 6-digit access code (`DASHBOARD_ACCESS_CODE`, no user accounts) and issues a signed, HttpOnly view-only session cookie (12 h).
+`proxy.ts` redirects every page to `/login` without it and returns `401` for `/api/*`. Five wrong codes lock a client out for 5 minutes (in-memory, per instance). `SESSION_SECRET` must be set in production.
 
-See `.env.example` for full template.
+## Node-RED channels
 
-### Development
+Host is fixed in `lib/nodeRedWebSocket.ts` (`wss://node-dev.iotaiml.dpdns.org`).
 
-```bash
-pnpm dev     # Next dev on 0.0.0.0:5175
-```
+| Path | Direction | Payload |
+| --- | --- | --- |
+| `/ws/dashboard` | both | `dashboard:data` (full) / `dashboard:update` (partial) with `DashboardData` fields from `lib/perfTypes.ts`; UI sends `dashboard:command` (`load-all`, `set-speed`, `select-machine`, `acknowledge-alerts`) |
+| `/ws/data` | in | `{ device: "data", value: { batchPartNo, activePartNo } }` |
+| `/ws/machine` | in | `{ device: "machine", value: { power, led, production } }` |
+| `/ws/stop` | in | `{ device: "stop", value: boolean }` |
+| `/ws/speak` | out | voice transcript `{ device: "speak", value, source: "dashboard" }` |
+| `/ws/voice` | in | text for SAM AI to speak |
 
-### Build
+Every `DashboardData` field defaults to `0` / `""` / `[]`, so Node-RED can send any subset.
 
-```bash
-pnpm build   # Next production build
-pnpm start   # Next start on 0.0.0.0:4173
-```
+## CCTV
 
-### Lint
+The header CCTV button opens a draggable, resizable window that embeds a [go2rtc](https://github.com/AlexxIT/go2rtc) player page from `CCTV_STREAM_URL` (e.g. `https://cctv.example.com/stream.html?src=camera1&mode=webrtc,mse`). Its origin is added to the CSP `frame-src` when the Next config loads, so rebuild after changing it. Use an https go2rtc URL when the dashboard is served over https.
 
-```bash
-pnpm lint    # next lint (eslint.config.mjs → next/core-web-vitals)
-```
+## Voice
 
-## Architecture
-
-- `app/` — Next App Router (`layout.tsx` fonts+globals, `page.tsx` force-dynamic, `globals.css` Tailwind tokens)
-- `app/components/dashboard/DashboardClient.tsx` — `'use client'` UI + 8 WS + `useVoiceCapture`
-- `components/ui/` — shadcn/ui (`button`, `card`, `switch`, `input`, `select`, `label`, `separator`, `badge`) + custom `led.tsx`
-- `lib/` — `nodeRedWebSocket.ts`, `deepgram.ts`, `voiceService.ts`, `utils.ts` (migrated from `src/services`)
-- `hooks/useVoiceCapture.ts` — microphone hook (migrated from `src/features/voice`)
-- `app/api/deepgram/` — `tts/route.ts` + `token/route.ts` server proxies (hide `DEEPGRAM_API_KEY`)
-- Legacy Vite reference: `src/` (kept for diff until fully removed), `vite.config.js` deprecated
-
-## WebSocket Endpoints
-
-- `/ws/machine` — Machine switch power command + echo (`value: { power, led, production }`: switch command, POWER LED feedback, PRODUCTION feedback — independent)
-- `/ws/dashboard` — Order and production data
-- `/ws/speak` — Voice input from dashboard to Node-RED
-- `/ws/voice` — Voice output from Node-RED to dashboard
-- `/ws/stop` — Production stop signal
-- `/ws/reset` — Production reset
-- `/ws/placeOrder` — Order placement
-- `/ws/dateTime` — Scheduled production time
-
-## Voice Pipeline
-
-Microphone -> Deepgram STT (`lib/deepgram.ts` + `hooks/useVoiceCapture.ts`) -> Node-RED (`/ws/speak`) -> Node-RED Processing -> Node-RED TTS response (`/ws/voice`) -> `lib/voiceService.ts` -> Deepgram TTS (`lib/deepgram.ts` or `app/api/deepgram/tts`) -> Audio Playback
+Mic → Deepgram STT (browser `SpeechRecognition` fallback) → `/ws/speak` → Node-RED → `/ws/voice` → Deepgram TTS → speaker.
+The draggable SAM AI orb shows the live transcript, a thinking state, and the reply.
