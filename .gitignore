@@ -54,3 +54,6 @@ turbo
 # Misc
 .cache
 .parcel-cache
+
+# Local Playwright MCP output
+.playwright-mcp/
