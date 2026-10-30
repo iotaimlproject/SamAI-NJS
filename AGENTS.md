@@ -8,11 +8,12 @@ Single-purpose Next.js 16 App Router (TSX) + shadcn/ui realtime **Performance Da
 
 - Install: `pnpm install` (pnpm only — `packageManager: pnpm@10.32.1`; never npm)
 - Dev: `pnpm dev` (`0.0.0.0:5175`) · Build: `pnpm build` · Prod: `pnpm start` (`:5175`)
-- Verify: `pnpm typecheck`, `pnpm check` (asserts in `lib/auth/session.check.ts` and `lib/perfLayout.check.ts`), `pnpm build`
+- Verify: `pnpm typecheck`, `pnpm check` (asserts in `lib/auth/session.check.ts`, `lib/perfLayout.check.ts`, then `pnpm test`), `pnpm build`
+- Unit tests: `pnpm test` runs `node --test "lib/**/*.test.ts"` (built-in `node:test`, no framework). `lib/nodeRedWebSocket.test.ts` drives the socket layer with a fake `WebSocket` + `mock.timers` (no network); `lib/perfTelemetry.test.ts` covers payload coercion, topics, snapshots and the per-machine store. Single file: `node --no-warnings --test lib/perfTelemetry.test.ts`.
 - `pnpm lint` currently crashes: `typescript-eslint` 8.x rejects TypeScript 7.0.
 - Clean: `pnpm clean`
 
-No test framework, no CI.
+No CI.
 
 ## Setup
 
@@ -28,8 +29,8 @@ No test framework, no CI.
 - `app/login/` — code-only login (`InputOTP`, masked with reveal toggle, auto-submit, shake on error). `components/theme-toggle.tsx` is shared by login and header and switches theme with a View Transition that spreads as a soft-edged circle from the button (`theme-flow` in `globals.css`). `components/logo.tsx` is the SAM AI mark (black tile, white hexagon + isometric S); `public/favicon.svg`/`.ico`/`apple-touch-icon.png` are the same mark in fixed colors.
 - `app/page.tsx` — renders `app/components/perf/PerfDashboardClient.tsx` (`'use client'`).
 - `app/components/perf/` — panels: `PerfHeader`, `PerfLiveBatch`, `PerfOeeOverview` (`PerfGauge` arcs with 0–50 red / 50–70 amber / 70–100 green zone band + machine/production LED `Item`s + progress), `PerfMetricList` (scrollable OEE/Energy tiles), `PerfProductionCharts` (fixed-height bar charts), `PerfAiPanel`, `PerfMessagesAlerts`, `PerfDataPanel` (filter, CSV export, table), `PerfVoiceOrb` (draggable, transcript/thinking/reply callout), `PerfCctvWindow` (draggable/resizable go2rtc iframe window, mounted only while open). Shared bits in `perfUi.tsx` (`PANEL`, `PanelHeading`, `MetricTile`, tones, `TAB_*`, formatters).
-- Hooks: `usePerfDashboardSocket` (`/ws/dashboard`, `sendCommand`), `useMachineLeds` (`/ws/machine` + `/ws/stop`), `usePerfDataFeed` (`/ws/data`), `usePerfVoice` (wraps `useVoiceCapture` + `/ws/speak` + `/ws/voice`, phases `idle|listening|thinking|speaking`).
-- `lib/perfTypes.ts` — `DashboardData` + `EMPTY_DASHBOARD`; `lib/perfTelemetry.ts` — telemetry fallback patch.
+- Hooks: `usePerfDashboardSocket` (`/ws/perf/live` topics → per-machine store, selected machine, `sendCommand`), `usePerfVoice` (wraps `useVoiceCapture` + `/ws/perf/speak` + `/ws/perf/voice`, phases `idle|listening|thinking|speaking`).
+- `lib/perfTypes.ts` — `DashboardData` + `EMPTY_DASHBOARD`; `lib/perfTelemetry.ts` — topic decoding and the per-machine store (see Data protocol).
 - `lib/deepgram.ts` (STT `nova-3`/`en-IN`, TTS, half-duplex speaking lock), `lib/voiceService.ts`, `hooks/useVoiceCapture.ts` (browser `SpeechRecognition` fallback; token fetched only once the mic is enabled).
 - Path alias `@/*` → `./*`.
 
@@ -49,16 +50,23 @@ shadcn `radix-nova` preset, Tailwind v4, no `tailwind.config`. `app/globals.css`
 
 ## Data protocol
 
-- `/ws/dashboard`: `dashboard:data` (full, merged over `EMPTY_DASHBOARD`) → `dashboard:update` (partial merge) → `extractTelemetryPatch` fallback. On open the client sends `dashboard:request` / `initial-data`.
-- Commands: `{ type: "dashboard:command", command: "load-all" | "start" | "stop" | "reset" | "set-speed" | "select-machine" | "acknowledge-alerts", payload? }`.
-- Zero-default rule: every `DashboardData` field has a `0`/`""`/`[]` default; add new fields to both the interface and `EMPTY_DASHBOARD`, and render `--` for empty strings (`orDash`).
-- `machine` payload: `value: { power, led, production }` — independent states.
+Machine data lives in MQTT on the plant broker (`10.53.148.199:1883`, the shared `mqtt-broker` config in Node-RED), one retained message per data point. The browser can't reach that broker, so Node-RED bridges it to one socket, `/ws/perf/live` (voice keeps `/ws/perf/speak` + `/ws/perf/voice`).
+
+- Topic: `perf/<machine>/<panel>/<field>`, payload = JSON value, retained, QoS 1 (e.g. `perf/CNC-02/oee/availability` → `61`). Panels: `header`, `batch`, `oee`, `metrics`, `charts`, `ai`, `alerts`, `table`, `machine` (`power`, `led`, `production`), `stop` (`stop`). `<field>` is a `DashboardData` key; the panel only groups topics. A 3-level `perf/<machine>/<panel>` topic with an object of fields is also accepted.
+- Bridge → browser: `{ topic, payload }` per broker message, or `{ type: "snapshot", messages: [{ topic, payload }] }` (the bridge's cache of retained values) in reply to a subscribe.
+- Browser → bridge: `{ type: "subscribe", topics: ["perf/+/#"] }` on every socket open (so a reconnect resyncs); commands `{ topic: "perf/<machine>/cmd", payload: { type: "dashboard:command", command, payload? } }`, published to MQTT unretained. `acknowledge-alerts` also publishes `perf/<machine>/alerts/alerts` = `[]` (retained).
+- Client: `lib/perfTelemetry.ts` — `decodeFrame`, `parseTopic`, `applyPerfMessages` (per-machine `MachineStore`, JSON-string payloads parsed, returns the same store when nothing changed), `toPanelPatch` (coerces fields to their `EMPTY_DASHBOARD` default type). `usePerfDashboardSocket` keeps every machine's data; the header select (`machines` = machines seen) only switches which one renders, with no request and no effect on other viewers.
+- Zero-default rule: every `DashboardData` field has a `0`/`""`/`[]`/`false` default; add new fields to both the interface and `EMPTY_DASHBOARD`, and render `--` for empty strings (`orDash`).
+- Going direct to MQTT: once the broker exposes MQTT over `wss`, swap the socket in `usePerfDashboardSocket` for an MQTT client subscribed to `perf/+/#` (retained messages replace the snapshot) and delete the bridge; topics and payloads stay the same.
+- Node-RED **NextJS Perf** tab (`64c74ba883b466d0`): one **group per machine** with env `MACHINE` (e.g. `CNC-01`). Inside it, one nested group per dashboard panel, named and ordered like the dashboard and stacked one below another: Header → Live Batch Metrics → OEE Real-Time Arcs (gauges, `machine/*` LEDs, `stop`, progress) → OEE Data / Energy Data → Predictive Telemetry & AI Variances → AI OEE Data / AI Maintenance → System Telemetry & Alerts → Production Data (`table/*`). Machines are stacked too, with the Bridge and Voice groups below. Every rendered `DashboardData` field has an inject (check: each `view.<field>` in `PerfDashboardClient.tsx` has a change node). Per data point: inject (value) → change (`msg.topic = "<panel>/<field>"`) → the panel's junction → the machine junction → **Publish** (`perf/${env MACHINE}/…`, JSON, retained) → `mqtt out`. New fields go in their panel group and wire to that panel's junction. Add a machine by copying a group and changing `MACHINE`; feed real data by wiring the PLC value into the field's change node. **Bridge**: `mqtt in perf/#` → cache (`perfCache`, refilled from retained messages on reconnect) → `websocket out`; `websocket in` → **Gateway** (subscribe → snapshot to that `_session`; `cmd` → **Commands** → `mqtt out`). Function code in the tab is indented and commented; keep it that way.
+- Clear a data point by publishing an empty retained message to its topic.
 
 ## WebSocket rules
 
-- Never `new WebSocket` / `socket.send` for Node-RED directly. Use `getNodeRedSocket(path, handlers)`, `sendNodeRedMessage(path, payload)`, `closeNodeRedSocket(path)` with `NODE_RED_WS_PATHS` keys: `dashboard`, `data`, `machine`, `stop`, `speak`, `voice`.
+- Never `new WebSocket` / `socket.send` for Node-RED directly. Use `getNodeRedSocket(path, handlers)`, `sendNodeRedMessage(path, payload)`, `closeNodeRedSocket(path)` with `NODE_RED_WS_PATHS` keys: `live`, `speak`, `voice`.
 - Client socket/voice code is `'use client'`; always `closeNodeRedSocket(path)` in `useEffect` cleanup.
-- `lib/nodeRedWebSocket.ts`: cached connection per path, 150ms connect staggering, 8s connect timeout, backoff `1s * 1.5^n` capped 30s, bounded 50-message queue.
+- `lib/nodeRedWebSocket.ts`: cached connection per path, one handshake at a time (browsers already serialize WebSocket handshakes per host; the queue keeps the 8s connect timeout from counting time spent waiting, and puts already-failing paths behind fresh ones), 8s connect timeout, backoff `1s * 1.5^n` capped 30s, `online`/tab-visible skips the backoff, closing detaches handlers. Outbound queue holds 50 messages and drops anything older than `MAX_QUEUE_AGE_MS` (10s) so stale commands never fire late.
+- `usePerfDashboardSocket` coalesces all messages in one animation frame into one render, and `applyPerfMessages` returns the previous store when nothing changed (no re-render). `toPanelPatch` coerces every field to its `EMPTY_DASHBOARD` default type (numeric strings → numbers, wrong types/non-object array items dropped), so a bad payload can't crash a panel.
 
 ## Git / variants
 

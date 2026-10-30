@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { LabeledValue } from "@/lib/perfTypes";
 import { cn } from "@/lib/utils";
-import { PANEL, StatusDot, TAB_LIST, TAB_TRIGGER, fmtPct, orDash } from "./perfUi";
+import { PANEL, StatusDot, TAB_LIST, TAB_TRIGGER, fmtNum, fmtPct, orDash } from "./perfUi";
 
 interface Props {
   predictedOEE: number;
@@ -37,7 +37,7 @@ function Readouts({ rows }: { rows: LabeledValue[] }) {
 function PerfAiPanel(props: Props) {
   const readouts: LabeledValue[] = [
     { label: "Predicted OEE", value: fmtPct(props.predictedOEE) },
-    { label: "AI Suggested Speed", value: fmtPct(props.aiSuggestedSpeed) },
+    { label: "AI Suggested Speed", value: fmtNum(props.aiSuggestedSpeed) },
     { label: "Speed Status", value: props.speedStatus },
   ];
 

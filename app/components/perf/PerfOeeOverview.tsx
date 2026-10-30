@@ -63,16 +63,25 @@ function RefreshedAgo({ updatedAt }: { updatedAt: number | null }) {
   return <span className="font-mono text-[0.6875rem] text-muted-foreground">Refreshed: {label} ago</span>;
 }
 
+// Each status gets its own box, tinted by state, filling half the cell.
+const STATUS_BOX: Record<Tone, string> = {
+  primary: "border-primary/30 bg-primary/5",
+  success: "border-success/35 bg-success/5",
+  warning: "border-warning/35 bg-warning/5",
+  destructive: "border-destructive/35 bg-destructive/5",
+  muted: "",
+};
+
 function StatusItem({ title, state }: { title: string; state: StatusState }) {
   const lit = state.tone === "success" || state.tone === "destructive";
   return (
-    <Item size="xs" className="group/status gap-3 px-2 py-1.5 transition-colors hover:bg-muted/60">
+    <Item size="xs" className={cn("group/status h-full gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-muted/60", STATUS_BOX[state.tone])}>
       <ItemMedia className="transition-transform duration-200 group-hover/status:scale-110">
-        <Led on={lit} color={state.tone === "destructive" ? "red" : "green"} pulse={state.tone === "success"} label={`${title} ${state.label}`} className="size-9" />
+        <Led on={lit} color={state.tone === "destructive" ? "red" : "green"} pulse={state.tone === "success"} label={`${title} ${state.label}`} className="size-10" />
       </ItemMedia>
       <ItemContent className="min-w-0 gap-0.5">
-        <ItemTitle className="text-sm font-bold uppercase tracking-wide">{title}</ItemTitle>
-        <ItemDescription className={cn("truncate text-xs font-medium", TONE_TEXT[state.tone])}>{state.detail}</ItemDescription>
+        <ItemTitle className="text-base font-bold uppercase tracking-wide">{title}</ItemTitle>
+        <ItemDescription className={cn("truncate text-sm font-medium", TONE_TEXT[state.tone])}>{state.detail}</ItemDescription>
       </ItemContent>
     </Item>
   );
@@ -93,7 +102,7 @@ function PerfOeeOverview(props: Props) {
         <PerfGauge title="Performance" value={props.performance} note={props.performanceNote} color="var(--gauge-performance)" />
         <PerfGauge title="Quality" value={props.quality} note={props.qualityNote} color="var(--warning)" />
         <PerfGauge title="Overall OEE" value={props.oee} note={props.oeeNote} color="var(--chart-predicted)" />
-        <div className="col-span-2 grid grid-cols-2 content-center gap-1 rounded-lg border px-1.5 py-1 md:col-span-4 xl:col-span-1 xl:grid-cols-1 xl:divide-y">
+        <div className="col-span-2 grid grid-cols-2 gap-1.5 md:col-span-4 xl:col-span-1 xl:grid-cols-1 xl:grid-rows-2">
           <StatusItem title="Machine" state={machineState(props)} />
           <StatusItem title="Production" state={productionState(props)} />
         </div>

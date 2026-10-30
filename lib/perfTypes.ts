@@ -64,8 +64,6 @@ export interface DashboardData {
   performance: number;
   quality: number;
   oee: number;
-  machineOn: boolean;
-  productionRunning: boolean;
   progress: number;
   predictedOEE: number;
   aiSuggestedSpeed: number;
@@ -81,8 +79,11 @@ export interface DashboardData {
   component?: string;
   supervisorId?: string;
   operatorId?: string;
-  machineName: string;
-  machines: string[];
+  // Machine status, published on perf/<machine>/machine and perf/<machine>/stop.
+  power: boolean;
+  led: boolean;
+  production: boolean;
+  stop: boolean;
   plc: string;
   systemStatus: string;
   aiModel: string;
@@ -105,11 +106,6 @@ export interface DashboardData {
   jitter: string;
   parts: BatchRow[];
 }
-
-export type DashboardMessage =
-  | { type: "dashboard:data"; payload: DashboardData }
-  | { type: "dashboard:update"; payload: Partial<DashboardData> }
-  | { type: string; payload?: unknown };
 
 export interface DashboardCommand {
   type: "dashboard:command";
@@ -145,8 +141,6 @@ export const EMPTY_DASHBOARD: DashboardData = {
   performance: 0,
   quality: 0,
   oee: 0,
-  machineOn: false,
-  productionRunning: false,
   progress: 0,
   predictedOEE: 0,
   aiSuggestedSpeed: 0,
@@ -156,8 +150,10 @@ export const EMPTY_DASHBOARD: DashboardData = {
   speedChart: [],
   profitChart: [],
   batches: [],
-  machineName: "",
-  machines: [],
+  power: false,
+  led: false,
+  production: false,
+  stop: false,
   plc: "",
   systemStatus: "",
   aiModel: "",

@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next out dist .turbo tsconfig.tsbuildinfo",
     "preview": "next start -H 0.0.0.0 -p 5175",
-    "check": "node --no-warnings lib/auth/session.check.ts && node --no-warnings lib/perfLayout.check.ts"
+    "test": "node --no-warnings --test \"lib/**/*.test.ts\"",
+    "check": "node --no-warnings lib/auth/session.check.ts && node --no-warnings lib/perfLayout.check.ts && pnpm test"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

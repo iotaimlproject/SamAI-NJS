@@ -57,3 +57,4 @@ turbo
 
 # Local Playwright MCP output
 .playwright-mcp/
+node-registry.json

@@ -1,82 +1,92 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { DashboardCommand, DashboardData, DashboardMessage } from "@/lib/perfTypes";
-import { EMPTY_DASHBOARD } from "@/lib/perfTypes";
-import { extractTelemetryPatch } from "@/lib/perfTelemetry";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DashboardCommand } from "@/lib/perfTypes";
 import {
-  NODE_RED_WS_PATHS,
-  closeNodeRedSocket,
-  getNodeRedSocket,
-  sendNodeRedMessage,
-} from "@/lib/nodeRedWebSocket";
+  PERF_TOPIC_ALL,
+  applyPerfMessages,
+  commandTopic,
+  decodeFrame,
+  parseTopic,
+  type MachineStore,
+  type PerfMessage,
+} from "@/lib/perfTelemetry";
+import { NODE_RED_WS_PATHS, closeNodeRedSocket, getNodeRedSocket, sendNodeRedMessage } from "@/lib/nodeRedWebSocket";
 
-const PATH = NODE_RED_WS_PATHS.dashboard;
+const PATH = NODE_RED_WS_PATHS.live;
 
-function applyMessage(message: DashboardMessage): Partial<DashboardData> | { full: DashboardData } | null {
-  if (message.type === "dashboard:data" && message.payload) {
-    return { full: message.payload as DashboardData };
-  }
-  if (message.type === "dashboard:update" && message.payload) {
-    return message.payload as Partial<DashboardData>;
-  }
-  return extractTelemetryPatch(message);
-}
-
+// Transport for the perf topics. To move to MQTT, replace this effect's socket with an MQTT client:
+// subscribe(PERF_TOPIC_ALL) and feed each (topic, JSON payload) into the same `pending` queue;
+// retained messages replace the snapshot.
 export function usePerfDashboardSocket() {
-  const mountedRef = useRef(true);
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [store, setStore] = useState<MachineStore>({});
+  const [selected, setSelected] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [settled, setSettled] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Readonly<Record<string, number>>>({});
 
   useEffect(() => {
-    mountedRef.current = true;
-    setConnecting(true);
+    let mounted = true;
+    // Coalesce every message that lands in one animation frame into a single render.
+    let pending: PerfMessage[] = [];
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      if (!mounted || pending.length === 0) return;
+      const batch = pending;
+      pending = [];
+      setStore((previous) => applyPerfMessages(previous, batch));
+      const now = Date.now();
+      const oee = batch.map((m) => parseTopic(m.topic)).filter((t) => t?.panel === "oee");
+      if (oee.length > 0) setUpdatedAt((previous) => ({ ...previous, ...Object.fromEntries(oee.map((t) => [t!.machine, now])) }));
+    };
+    const status = (isOpen: boolean) => {
+      if (!mounted) return;
+      setConnected(isOpen);
+      setSettled(true);
+    };
+
     getNodeRedSocket(PATH, {
       onopen: () => {
-        if (!mountedRef.current) return;
-        setConnected(true);
-        setConnecting(false);
-        setError(null);
-        sendNodeRedMessage(PATH, { type: "dashboard:request", payload: { request: "initial-data" } });
+        status(true);
+        // Re-subscribing on every open also resyncs after a reconnect (the reply is a snapshot).
+        sendNodeRedMessage(PATH, { type: "subscribe", topics: [PERF_TOPIC_ALL] });
       },
       onmessage: (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const result = applyMessage(JSON.parse(event.data) as DashboardMessage);
-          if (!result) return;
-          if ("full" in result) setData({ ...EMPTY_DASHBOARD, ...result.full });
-          else setData((previous) => ({ ...EMPTY_DASHBOARD, ...previous, ...result }));
-          setUpdatedAt(Date.now());
-        } catch {
-          setError("Received an invalid message from Node-RED.");
-        }
+        if (!mounted) return;
+        const messages = decodeFrame(event.data);
+        if (messages.length === 0) return;
+        pending.push(...messages);
+        frame ||= requestAnimationFrame(flush);
       },
-      onerror: () => {
-        if (!mountedRef.current) return;
-        setConnecting(false);
-      },
-      onclose: () => {
-        if (!mountedRef.current) return;
-        setConnected(false);
-        setConnecting(false);
-      },
+      onerror: () => status(false),
+      onclose: () => status(false),
     });
     return () => {
-      mountedRef.current = false;
+      mounted = false;
+      cancelAnimationFrame(frame);
       closeNodeRedSocket(PATH);
     };
   }, []);
 
-  const sendCommand = useCallback((command: DashboardCommand["command"], payload?: DashboardCommand["payload"]) => {
-    return sendNodeRedMessage(PATH, { type: "dashboard:command", command, payload } satisfies DashboardCommand);
-  }, []);
+  const machines = useMemo(() => Object.keys(store).sort(), [store]);
+  const machine = selected !== null && store[selected] ? selected : (machines[0] ?? null);
 
-  const sendMessage = useCallback((message: unknown) => {
-    return sendNodeRedMessage(PATH, message);
-  }, []);
+  const sendCommand = useCallback(
+    (command: DashboardCommand["command"], payload?: DashboardCommand["payload"]) =>
+      machine !== null && sendNodeRedMessage(PATH, { topic: commandTopic(machine), payload: { type: "dashboard:command", command, payload } }),
+    [machine],
+  );
 
-  return { data, connected, connecting, error, updatedAt, sendMessage, sendCommand };
+  return {
+    data: machine !== null ? store[machine] : null,
+    machines,
+    machine,
+    selectMachine: setSelected,
+    connected,
+    connecting: !settled,
+    error: null,
+    updatedAt: machine !== null ? (updatedAt[machine] ?? null) : null,
+    sendCommand,
+  };
 }

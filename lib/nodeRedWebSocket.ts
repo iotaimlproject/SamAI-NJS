@@ -7,7 +7,7 @@ type Host = (typeof NODE_RED_HOSTS)[keyof typeof NODE_RED_HOSTS];
 const socketCache = new Map<string, SocketConnection>();
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const timeoutIds = new Map<string, ReturnType<typeof setTimeout>>();
-const pendingMessages = new Map<string, unknown[]>();
+const pendingMessages = new Map<string, { payload: unknown; at: number }[]>();
 
 export const RECONNECT = {
   initialDelay: 1000,
@@ -17,17 +17,18 @@ export const RECONNECT = {
 } as const;
 
 const MAX_PENDING_QUEUE = 50;
+// Commands queued while offline are dropped after this, so a stale "set-speed" never fires minutes later.
+export const MAX_QUEUE_AGE_MS = 10_000;
 
 const buildUrl = (path: string, host: Host = NODE_RED_HOSTS.production) =>
   `${host.protocol}://${host.host}${path.startsWith("/") ? path : `/${path}`}`;
 
+// One live socket carries every machine's data as MQTT-style topics (see lib/perfTelemetry.ts);
+// voice keeps its own pair. Swapping the live socket for an MQTT broker keeps the same topics.
 export const NODE_RED_WS_PATHS = {
-  dashboard: "/ws/dashboard",
-  data: "/ws/data",
-  machine: "/ws/machine",
-  stop: "/ws/stop",
-  speak: "/ws/speak",
-  voice: "/ws/voice",
+  live: "/ws/perf/live",
+  speak: "/ws/perf/speak",
+  voice: "/ws/perf/voice",
 } as const;
 
 export type NodeRedPath = (typeof NODE_RED_WS_PATHS)[keyof typeof NODE_RED_WS_PATHS];
@@ -40,14 +41,34 @@ export type SocketHandlers = {
   onclose?: (_event?: CloseEvent) => void;
 };
 
-const CONNECT_SPACING = 150;
-let nextConnectSlot = 0;
+// Browsers run one WebSocket handshake per host at a time (Chromium's endpoint lock), so we queue our own:
+// the connect timeout then measures a socket's own handshake, not its wait behind others, and paths that
+// already failed (e.g. no Node-RED listener yet, ~1.7s per 502) go to the back so they can't starve healthy ones.
+const connectQueue: SocketConnection[] = [];
+let handshaking: SocketConnection | null = null;
 
-function reserveConnectSlot(): number {
-  const now = Date.now();
-  const slot = Math.max(now, nextConnectSlot);
-  nextConnectSlot = slot + CONNECT_SPACING;
-  return slot - now;
+function pumpConnectQueue() {
+  while (!handshaking && connectQueue.length > 0) {
+    const next = connectQueue.shift()!;
+    if (next.closedManually || !next.connecting) continue;
+    handshaking = next;
+    if (!next.openSocket()) handshaking = null;
+  }
+}
+
+function releaseHandshake(connection: SocketConnection) {
+  const queued = connectQueue.indexOf(connection);
+  if (queued !== -1) connectQueue.splice(queued, 1);
+  if (handshaking !== connection) return;
+  handshaking = null;
+  pumpConnectQueue();
+}
+
+function enqueueConnect(connection: SocketConnection) {
+  const firstFailing = connection.attempts > 0 ? -1 : connectQueue.findIndex((queued) => queued.attempts > 0);
+  if (firstFailing === -1) connectQueue.push(connection);
+  else connectQueue.splice(firstFailing, 0, connection);
+  pumpConnectQueue();
 }
 
 class SocketConnection {
@@ -57,7 +78,6 @@ class SocketConnection {
   attempts = 0;
   closedManually = false;
   connecting = false;
-  pendingConnect: ReturnType<typeof setTimeout> | null = null;
   currentHost: Host = NODE_RED_HOSTS.production;
 
   constructor(path: string) {
@@ -83,18 +103,8 @@ class SocketConnection {
 
     this.closedManually = false;
     this.connecting = true;
-    const wait = reserveConnectSlot();
-    if (wait <= 0) return this.openSocket();
-    if (this.pendingConnect) clearTimeout(this.pendingConnect);
-    this.pendingConnect = setTimeout(() => {
-      this.pendingConnect = null;
-      if (this.closedManually) {
-        this.connecting = false;
-        return;
-      }
-      this.openSocket();
-    }, wait);
-    return null;
+    enqueueConnect(this);
+    return this.socket;
   }
 
   openSocket(): WebSocket | null {
@@ -132,6 +142,7 @@ class SocketConnection {
         }
         this.socket = null;
         this.connecting = false;
+        releaseHandshake(this);
         if (!this.closedManually) this.scheduleReconnect();
       }
     }, RECONNECT.timeout);
@@ -150,6 +161,7 @@ class SocketConnection {
   onOpen() {
     this.connecting = false;
     this.clearConnectTimeout();
+    releaseHandshake(this);
     this.attempts = 0;
     this.flushPending();
     this.handlers.onopen?.();
@@ -169,6 +181,7 @@ class SocketConnection {
   onClose(event?: CloseEvent) {
     this.connecting = false;
     this.clearConnectTimeout();
+    releaseHandshake(this);
     if (!this.closedManually) this.scheduleReconnect();
     this.handlers.onclose?.(event);
   }
@@ -190,16 +203,30 @@ class SocketConnection {
     const queue = pendingMessages.get(this.path);
     if (!queue || queue.length === 0) return;
     if (this.socket?.readyState !== WebSocket.OPEN) return;
+    const oldest = Date.now() - MAX_QUEUE_AGE_MS;
     while (queue.length > 0) {
-      const payload = queue.shift();
-      try {
-        this.socket.send(JSON.stringify(payload));
-      } catch {
-        this.queue(payload);
-        break;
+      const item = queue[0];
+      if (item.at >= oldest) {
+        try {
+          this.socket.send(JSON.stringify(item.payload));
+        } catch {
+          break;
+        }
       }
+      queue.shift();
     }
     if (queue.length === 0) pendingMessages.delete(this.path);
+  }
+
+  // Skip the backoff wait (network back / tab visible again).
+  reconnectNow() {
+    if (this.closedManually || this.connecting || this.socket?.readyState === WebSocket.OPEN) return;
+    const key = `${this.path}-${this.currentHost.host}`;
+    const timer = reconnectTimers.get(key);
+    if (timer) clearTimeout(timer);
+    reconnectTimers.delete(key);
+    this.attempts = 0;
+    this.connect();
   }
 
   send(payload: unknown): boolean {
@@ -221,15 +248,11 @@ class SocketConnection {
     if (!pendingMessages.has(this.path)) pendingMessages.set(this.path, []);
     const queue = pendingMessages.get(this.path)!;
     if (queue.length >= MAX_PENDING_QUEUE) queue.shift();
-    queue.push(payload);
+    queue.push({ payload, at: Date.now() });
   }
 
   close() {
     this.closedManually = true;
-    if (this.pendingConnect) {
-      clearTimeout(this.pendingConnect);
-      this.pendingConnect = null;
-    }
     const key = `${this.path}-${this.currentHost.host}`;
     const timer = reconnectTimers.get(key);
     if (timer) {
@@ -240,26 +263,42 @@ class SocketConnection {
     pendingMessages.delete(this.path);
     const s = this.socket;
     if (s) {
-      if (s.readyState === WebSocket.OPEN) {
+      s.onopen = null;
+      s.onclose = null;
+      s.onerror = null;
+      s.onmessage = null;
+      // Also cancel an in-flight handshake: the browser holds its per-host handshake lock until it ends.
+      if (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING) {
         try {
           s.close();
         } catch {
           void 0;
         }
-      } else if (s.readyState === WebSocket.CONNECTING) {
-        s.onopen = null;
-        s.onclose = null;
-        s.onerror = null;
-        s.onmessage = null;
       }
     }
     this.socket = null;
     this.connecting = false;
     this.attempts = 0;
+    releaseHandshake(this);
   }
 }
 
+let wakeListenersAdded = false;
+
+function reconnectAll() {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+  for (const connection of socketCache.values()) connection.reconnectNow();
+}
+
+function addWakeListeners() {
+  if (wakeListenersAdded || typeof window === "undefined") return;
+  wakeListenersAdded = true;
+  window.addEventListener("online", reconnectAll);
+  document.addEventListener("visibilitychange", reconnectAll);
+}
+
 export function getNodeRedSocket(path: string, handlers: SocketHandlers = {}): WebSocket | null {
+  addWakeListeners();
   let connection = socketCache.get(path);
   if (!connection) {
     connection = new SocketConnection(path);

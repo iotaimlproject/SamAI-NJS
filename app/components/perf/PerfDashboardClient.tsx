@@ -32,8 +32,6 @@ import PerfVoiceOrb from "./PerfVoiceOrb";
 import PerfCctvWindow from "./PerfCctvWindow";
 import { fmtMoney, fmtNum, orDash } from "./perfUi";
 import { usePerfDashboardSocket } from "@/hooks/usePerfDashboardSocket";
-import { useMachineLeds } from "@/hooks/useMachineLeds";
-import { usePerfDataFeed } from "@/hooks/usePerfDataFeed";
 import { EMPTY_DASHBOARD, type DashboardData } from "@/lib/perfTypes";
 import { DashboardLayout, type PanelLayouts } from "@/lib/perfLayout";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -73,9 +71,7 @@ function PanelHandle() {
 const scrollToData = () => document.getElementById("perf-data-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: string; layouts: PanelLayouts }) {
-  const { data, connected, connecting, error, updatedAt, sendCommand } = usePerfDashboardSocket();
-  const leds = useMachineLeds();
-  const feed = usePerfDataFeed();
+  const { data, machines, machine, selectMachine, connected, connecting, error, updatedAt, sendCommand } = usePerfDashboardSocket();
   const view = data ?? EMPTY_DASHBOARD;
   const items = useMemo(() => metricItems(view), [view]);
   const [cctvOpen, setCctvOpen] = useState(false);
@@ -89,7 +85,6 @@ export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: str
     setLayoutVersion((version) => version + 1);
   }, [layout]);
 
-  const selectMachine = useCallback((machine: string) => sendCommand("select-machine", { machine }), [sendCommand]);
   const loadAll = useCallback(() => sendCommand("load-all"), [sendCommand]);
   const acknowledgeAlerts = useCallback(() => sendCommand("acknowledge-alerts"), [sendCommand]);
   const applyAi = useCallback(() => sendCommand("set-speed", { speed: view.aiSuggestedSpeed }), [sendCommand, view.aiSuggestedSpeed]);
@@ -117,8 +112,8 @@ export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: str
       <PerfHeader
         connected={connected}
         connecting={connecting}
-        machineName={view.machineName}
-        machines={view.machines}
+        machineName={machine ?? ""}
+        machines={machines}
         plc={view.plc}
         systemStatus={view.systemStatus}
         cycleTime={view.cycleTime}
@@ -139,8 +134,8 @@ export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: str
                 <ResizablePanel id="panel-batch" defaultSize="15.75rem" minSize="5rem" style={VISIBLE}>
                   <PerfLiveBatch
                     batchId={view.batchId}
-                    batchPartNo={feed.batchPartNo ?? view.batchPartNo}
-                    activePartNo={feed.activePartNo ?? view.activePartNo}
+                    batchPartNo={view.batchPartNo}
+                    activePartNo={view.activePartNo}
                     batchStart={view.batchStart}
                     batchFinish={view.batchFinish}
                     downtimeT={view.downtimeT}
@@ -170,10 +165,10 @@ export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: str
                     performanceNote={view.performanceNote}
                     qualityNote={view.qualityNote}
                     oeeNote={view.oeeNote}
-                    machineOn={leds.machineOn}
-                    powerOn={leds.powerOn}
-                    productionOn={leds.productionOn}
-                    stopped={leds.stop}
+                    machineOn={view.power}
+                    powerOn={view.led}
+                    productionOn={view.production}
+                    stopped={view.stop}
                     progress={view.progress}
                     predictedProgress={view.predictedProgress}
                     partsProduced={view.partsProduced}
@@ -225,7 +220,7 @@ export default function PerfDashboardClient({ cctvUrl, layouts }: { cctvUrl: str
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {cctvOpen && cctvStream && <PerfCctvWindow url={cctvStream} camera={view.machineName} onClose={closeCctv} />}
+      {cctvOpen && cctvStream && <PerfCctvWindow url={cctvStream} camera={machine ?? ""} onClose={closeCctv} />}
 
       <PerfVoiceOrb />
     </div>
